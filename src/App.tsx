@@ -126,9 +126,12 @@ export default function App() {
   const { messages, addMessage, replaceHistory, clearMessages } = useVolatileChat(roomId, lifespanMinutes);
 
   const handleMessageReceived = useCallback((msg: ChatMessage) => { addMessage(msg); }, [addMessage]);
+  
+  // FIX 1: Sync room creation time directly from the history payload so "Calculating..." clears instantly on refresh
   const handleHistoryReceived = useCallback((newMessages: ChatMessage[], roomState: RoomState) => {
     replaceHistory(newMessages, roomState);
     setLifespanMinutes(roomState.lifespanMinutes);
+    setRoomCreatedAt(roomState.createdAt);
   }, [replaceHistory]);
 
   const handleSystemAlert = useCallback((text: string) => {
@@ -181,15 +184,18 @@ export default function App() {
 
   const handleCreateRoom = useCallback(async (selectedLifespan: number) => {
     const newRoomId = generateRoomId();
-    setLifespanMinutes(selectedLifespan);
-    setRoomId(newRoomId);
-
+    
+    // FIX 2: Await the database insert completely BEFORE setting the local state.
+    // This entirely prevents the race condition that causes "Calculating..." and room crashes.
     await supabase.from('rooms').insert({ id: newRoomId, lifespan_minutes: selectedLifespan, admin_peer_id: peerId, if_muted_globally: false });
     await supabase.from('messages').insert({
       id: nanoid(), room_id: newRoomId, text: `👑 CORE MATRIX STACK LOGGED BY HOST OWNER (${userName})`,
       sender_id: 'SYSTEM', sender_name: 'SYSTEM', timestamp: Date.now(), if_system_message: true, sender_privilege_badge: 'OWNER'
     });
 
+    setLifespanMinutes(selectedLifespan);
+    setRoomCreatedAt(Date.now());
+    setRoomId(newRoomId);
     setShowCreateModal(false);
   }, [peerId, userName]);
 
@@ -231,7 +237,9 @@ export default function App() {
   }, [roomId, userRole, removeRoomFromHistory]);
 
   return (
-    <div className="h-screen w-screen flex bg-[#0b0c10] text-white overflow-hidden font-sans selection:bg-emerald-500/30 relative">
+    // FIX 3: Replaced "h-screen w-screen" with "fixed inset-0 h-[100dvh] w-full". 
+    // This forces the mobile browser address bar to stop pushing the top header off the screen!
+    <div className="fixed inset-0 h-[100dvh] w-full flex bg-[#0b0c10] text-white overflow-hidden font-sans selection:bg-emerald-500/30">
       {isMobileSidebarOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden block transition-opacity duration-200" onClick={() => setIsMobileSidebarOpen(false)} />
       )}
