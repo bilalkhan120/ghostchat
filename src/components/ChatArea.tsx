@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Shield, Zap, Volume2, VolumeX, Trash2, Menu, ShieldCheck, EyeOff, Trash, Plus, Key, Copy, Check } from 'lucide-react';
+import { Send, Shield, Zap, Volume2, VolumeX, Trash2, Menu, ShieldCheck, EyeOff, Plus, Key, Copy, Check } from 'lucide-react';
 import type { ChatMessage } from '../types';
 
 interface ChatAreaProps {
@@ -18,7 +18,6 @@ interface ChatAreaProps {
   typingUsers: string[];
   onTypingStatusChange: (isTyping: boolean) => void;
   onOpenMobileMenu: () => void;
-  // Dynamic hooks injected to link home console events cleanly
   onCreateRoomTrigger?: () => void;
   onJoinRoomTrigger?: (id: string) => void;
 }
@@ -53,12 +52,30 @@ export function ChatArea({
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typingUsers]);
 
+  // Core event handling functions
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
     onSendMessage(inputText);
     setInputText('');
     onTypingStatusChange(false);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputText(e.target.value);
+    onTypingStatusChange(true);
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      onTypingStatusChange(false);
+    }, 2000);
+  };
+
+  const saveName = () => {
+    if (nameInput.trim()) {
+      onSetUserName(nameInput.trim());
+    }
+    setEditingName(false);
   };
 
   const handleMobileJoinSubmit = (e: React.FormEvent) => {
@@ -180,10 +197,17 @@ export function ChatArea({
                 </div>
               );
             })}
+
+            {typingUsers.length > 0 && (
+              <div className="flex items-center gap-2 text-[11px] text-[#4c4e5e] italic font-medium pl-1 animate-pulse select-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/40 animate-ping" />
+                <span>{typingUsers.join(', ')} typing response stream...</span>
+              </div>
+            )}
             <div ref={scrollRef} />
           </>
         ) : (
-          /* Redesigned Responsive Home Viewport Dashboard Console */
+          /* Feature Presentation Cards */
           <div className="w-full max-w-xl mx-auto space-y-6 py-2 px-1 animate-in fade-in zoom-in-95 duration-300">
             <div className="text-center space-y-2">
               <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mint-glow mx-auto shadow-lg">
@@ -193,7 +217,7 @@ export function ChatArea({
               <p className="text-xs text-[#828599] max-w-xs mx-auto">Deploy a fresh communication segment node or establish a connection tunnel instantly.</p>
             </div>
 
-            {/* Injected Mobile Control Console Tray for Phone viewports */}
+            {/* Mobile Control Panel Tray */}
             <div className="md:hidden block bg-[#0f111a] border border-white/[0.04] rounded-2xl p-4 space-y-3 shadow-xl">
               <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest block text-center">Mobile Terminal Control Panel</span>
               <button
@@ -218,7 +242,6 @@ export function ChatArea({
               </form>
             </div>
 
-            {/* Feature Description Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="p-4 rounded-xl bg-[#0f111a]/40 border border-white/[0.02] space-y-1.5">
                 <div className="flex items-center gap-2 text-emerald-400"><ShieldCheck size={14} /><span className="text-[11px] font-bold uppercase tracking-wider">Zero Log Storage</span></div>
