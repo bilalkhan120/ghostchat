@@ -32,18 +32,22 @@ export default function App() {
   const [lifespanMinutes, setLifespanMinutes] = useState(60);
   const [appNoticeMessage, setAppNoticeMessage] = useState<string | null>(null);
   
+  // Mobile responsive sidebar layout control tracking state
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  
   const [activeRooms, setActiveRooms] = useState<string[]>(() => {
     const saved = localStorage.getItem('ghostchat_history_list');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Dynamic Browser Tab Title Management System
   useEffect(() => {
     if (roomId) {
       document.title = `🔒 [${roomId}] Active Layer // GhostChat`;
     } else {
       document.title = `GhostChat // Secure Volatile Node`;
     }
+    // Auto-close responsive tray whenever you switch channels
+    setIsMobileSidebarOpen(false);
   }, [roomId]);
 
   const { messages, addMessage, replaceHistory, clearMessages } = useVolatileChat(roomId, lifespanMinutes);
@@ -170,6 +174,14 @@ export default function App() {
 
   return (
     <div className="h-screen w-screen flex bg-[#0b0c10] text-white overflow-hidden font-sans selection:bg-emerald-500/30 relative">
+      {/* Dimmed mobile interaction shadow overlay shield backdrop */}
+      {isMobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden block transition-opacity duration-200"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
+
       <Sidebar
         currentRoomId={roomId}
         rooms={activeRooms}
@@ -181,6 +193,8 @@ export default function App() {
         activeUsersList={activeUsersList}
         userRole={userRole}
         onPromotionControl={handlePromotionControl}
+        isOpenMobile={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
       <ChatArea
         roomId={roomId}
@@ -197,6 +211,7 @@ export default function App() {
         onToggleMute={toggleGlobalRoomMute}
         typingUsers={typingUsers}
         onTypingStatusChange={sendTypingStatus}
+        onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
       />
       {showCreateModal && (
         <CreateRoomModal onClose={() => setShowCreateModal(false)} onCreate={handleCreateRoom} />

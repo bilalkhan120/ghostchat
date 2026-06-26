@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, User, Copy, Check, Trash2, Radio, Clock, AlertTriangle, Lock, ServerCrash, Flame, Fingerprint, Volume2, VolumeX, Key, Eye } from 'lucide-react';
+import { Send, Shield, Zap, Volume2, VolumeX, Trash2, Menu } from 'lucide-react';
 import type { ChatMessage } from '../types';
 
 interface ChatAreaProps {
@@ -7,20 +7,17 @@ interface ChatAreaProps {
   messages: ChatMessage[];
   userName: string;
   peerId: string | null;
-  onSendMessage: (text: string, isSystem?: boolean) => void;
+  onSendMessage: (text: string) => void;
   onSetUserName: (name: string) => void;
   connectedPeers: number;
-  onDestroyRoom?: () => void;
+  onDestroyRoom: () => void;
   roomLifespanMinutes: number;
-  userRole?: 'OWNER' | 'ADMIN' | 'USER';
-  isMutedGlobally?: boolean;
-  onToggleMute?: () => void;
-  typingUsers?: string[];
-  onTypingStatusChange?: (isTyping: boolean) => void;
-}
-
-function formatTime(ts: number) {
-  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  userRole: string; // Changed from strict literal to open string type
+  isMutedGlobally: boolean;
+  onToggleMute: () => void;
+  typingUsers: string[];
+  onTypingStatusChange: (isTyping: boolean) => void;
+  onOpenMobileMenu: () => void;
 }
 
 export function ChatArea({
@@ -30,299 +27,207 @@ export function ChatArea({
   peerId,
   onSendMessage,
   onSetUserName,
-  connectedPeers,
   onDestroyRoom,
-  roomLifespanMinutes,
-  userRole = 'USER',
-  isMutedGlobally = false,
+  userRole,
+  isMutedGlobally,
   onToggleMute,
-  typingUsers = [],
+  typingUsers,
   onTypingStatusChange,
+  onOpenMobileMenu,
 }: ChatAreaProps) {
   const [inputText, setInputText] = useState('');
-  const [showNameEdit, setShowNameEdit] = useState(false);
-  const [tempName, setTempName] = useState(userName);
-  const [copied, setCopied] = useState(false);
-  const [showDestructModal, setShowDestructModal] = useState(false);
-  const [timeLeftStr, setTimeLeftStr] = useState('');
-  const [isTypingLocal, setIsTypingLocal] = useState(false);
-  const typingTimeoutRef = useRef<any>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState(userName);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<any>(null); // Avoid structural NodeJS conflicts
 
   useEffect(() => {
-    if (!roomId) return;
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, typingUsers]);
 
-    const targetEndTime = Date.now() + roomLifespanMinutes * 60 * 1000;
-    const updateClock = () => {
-      const remainingMs = targetEndTime - Date.now();
-      if (remainingMs <= 0) {
-        setTimeLeftStr('Expired');
-        return;
-      }
-      const totalSecs = Math.floor(remainingMs / 1000);
-      const hrs = Math.floor(totalSecs / 3600);
-      const mins = Math.floor((totalSecs % 3600) / 60);
-      const secs = totalSecs % 60;
-
-      if (hrs > 0) {
-        setTimeLeftStr(`${hrs}h ${mins}m`);
-      } else {
-        setTimeLeftStr(`${mins}m ${secs}s`);
-      }
-    };
-
-    updateClock();
-    const interval = setInterval(updateClock, 1000);
-    return () => clearInterval(interval);
-  }, [roomId, roomLifespanMinutes]);
-
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages]);
+  const handleSend = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputText.trim()) return;
+    onSendMessage(inputText);
+    setInputText('');
+    onTypingStatusChange(false);
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setInputText(value);
-    
-    if (!isTypingLocal) {
-      setIsTypingLocal(true);
-      onTypingStatusChange?.(true);
-    }
+    setInputText(e.target.value);
+    onTypingStatusChange(true);
 
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    
     typingTimeoutRef.current = setTimeout(() => {
-      setIsTypingLocal(false);
-      onTypingStatusChange?.(false);
+      onTypingStatusChange(false);
     }, 2000);
   };
 
-  const handleSend = () => {
-    if (!inputText.trim() || !roomId) return;
-    if (isMutedGlobally && userRole === 'USER') return;
-    
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    setIsTypingLocal(false);
-    onTypingStatusChange?.(false);
-
-    onSendMessage(inputText.trim(), false);
-    setInputText('');
+  const saveName = () => {
+    if (nameInput.trim()) {
+      onSetUserName(nameInput.trim());
+    }
+    setEditingName(false);
   };
 
-  if (!roomId) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-[#0b0c10] relative overflow-hidden p-6 select-none z-10 font-sans">
-        <div className="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:32px_32px] opacity-[0.02] pointer-events-none" />
-        
-        <div className="max-w-2xl w-full text-left space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-h-full flex flex-col justify-center relative z-10">
-          <div className="flex items-center gap-4 border-b border-white/5 pb-5 shrink-0">
-            <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shadow-lg shadow-emerald-500/5 shrink-0 mint-glow">
-              <Radio size={20} className="text-emerald-400 animate-pulse" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold tracking-tight text-white">Zero-Trace Communications Core</h2>
-              <p className="text-xs text-[#626475] font-medium mt-0.5">Isolated ephemeral matrix layers completely free from metadata retention pipelines.</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto max-h-[50vh] pr-1 scrollbar-thin">
-            <div className="p-4 rounded-2xl bg-[#12141d]/40 premium-glass border border-white/5 smooth-lift transition-all duration-300 space-y-2 group">
-              <div className="flex items-center gap-2.5 text-emerald-400 font-medium text-xs uppercase tracking-wide">
-                <Lock size={14} className="group-hover:rotate-12 transition-transform duration-300" />
-                <span>Zero-Knowledge Channels</span>
-              </div>
-              <p className="text-[11px] text-[#86899f] leading-relaxed">Standard text layers travel over open data grids monitored by corporate filters. GhostChat structures sandboxed tunnels—ensuring even our source developers hold absolute zero keys to intercept transmissions.</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-[#12141d]/40 premium-glass border border-white/5 smooth-lift transition-all duration-300 space-y-2 group">
-              <div className="flex items-center gap-2.5 text-blue-400 font-medium text-xs uppercase tracking-wide">
-                <Fingerprint size={14} className="group-hover:scale-110 transition-transform duration-300" />
-                <span>Anonymized Footprints</span>
-              </div>
-              <p className="text-[11px] text-[#86899f] leading-relaxed">Big Tech tracks who you message, your device IDs, IP addresses, and exact timestamps. GhostChat generates automated dynamic peer signatures on launch. No hardware identifiers, data pools, or user metrics are compiled or retained.</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-[#12141d]/40 premium-glass border border-white/5 smooth-lift transition-all duration-300 space-y-2 group">
-              <div className="flex items-center gap-2.5 text-amber-400 font-medium text-xs uppercase tracking-wide">
-                <Flame size={14} />
-                <span>Volatile Decay Shards</span>
-              </div>
-              <p className="text-[11px] text-[#86899f] leading-relaxed">Chat elements are held strictly within volatile server caches, completely eliminating storage drives. The millisecond the matrix clock terminates, a script scrubs cloud record sectors past forensic restoration.</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-[#12141d]/40 premium-glass border border-white/5 smooth-lift transition-all duration-300 space-y-2 group">
-              <div className="flex items-center gap-2.5 text-red-400 font-medium text-xs uppercase tracking-wide">
-                <ServerCrash size={14} />
-                <span>Total Host Command</span>
-              </div>
-              <p className="text-[11px] text-[#86899f] leading-relaxed">Ordinary apps grant users the power to extract data logs, capture screens, or linger in chats indefinitely. The Host Admin retains absolute cryptographic veto authority—enabling real-time user eviction (Kicking Node Links) or firing an emergency wipe command.</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-[#12141d]/40 premium-glass border border-white/5 smooth-lift transition-all duration-300 space-y-2 group">
-              <div className="flex items-center gap-2.5 text-cyan-400 font-medium text-xs uppercase tracking-wide">
-                <Key size={14} />
-                <span>Invisible Discovery</span>
-              </div>
-              <p className="text-[11px] text-[#86899f] leading-relaxed">Connection paths are bound exclusively to the unique `GHOST-` vector matrix string. There are no central room indices, public lookups, or exposed discovery lists. If you do not possess the alphanumeric key sequence, the node remains mathematically invisible.</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-[#12141d]/40 premium-glass border border-white/5 smooth-lift transition-all duration-300 space-y-2 group">
-              <div className="flex items-center gap-2.5 text-purple-400 font-medium text-xs uppercase tracking-wide">
-                <Eye size={14} />
-                <span>Isolated Client Sandbox</span>
-              </div>
-              <p className="text-[11px] text-[#86899f] leading-relaxed">Runs completely out of secure local browser allocations. There is no background syncing, device file system exploration, or hidden third-party tracking cookies enabled. Absolute containment, total tactical execution.</p>
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-emerald-500/[0.02] border border-emerald-500/10 flex items-center justify-center gap-3 text-center text-[10px] font-mono font-bold text-emerald-400/80 tracking-widest shrink-0">
-            <Radio size={12} className="animate-ping shrink-0" />
-            <span>AWAITING LINK INITIALIZATION // CONFIGURE TERMINAL CONSOLE TO CONNECT</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex-1 flex flex-col bg-[#0b0c10] relative overflow-hidden font-sans z-10">
-      <div className="h-16 border-b border-white/5 bg-[#0e1017]/40 backdrop-blur-md flex items-center justify-between px-5 z-10 select-none">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mint-glow">
-            <User size={15} className="text-emerald-400" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-white tracking-wide flex items-center gap-1.5 font-mono">
-              {roomId} 
-              {userRole !== 'USER' && <span className="text-[8px] font-sans bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded border-emerald-500/20 font-bold">{userRole === 'OWNER' ? 'Main Host' : 'Co-Admin'}</span>}
-            </p>
-            <div className="flex items-center gap-2 mt-0.5 text-[10px] text-[#626475] font-semibold">
-              <p>{connectedPeers + 1} ACTIVE SEGMENTS</p>
-              <span>|</span>
-              <p className="text-amber-500/90 flex items-center gap-1"><Clock size={11} /> LAYER DECAY: {timeLeftStr}</p>
-              {isMutedGlobally && <span className="text-red-400 font-bold bg-red-500/5 border border-red-500/20 px-1 rounded text-[8px] animate-pulse">MUTED</span>}
+    <div className="flex-1 flex flex-col min-w-0 bg-[#0b0c10] relative h-full">
+      <div className="h-16 border-b border-white/[0.04] bg-[#0f111a]/80 backdrop-blur-md px-4 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <button 
+            onClick={onOpenMobileMenu}
+            className="md:hidden p-2 rounded-xl text-[#828599] hover:text-white hover:bg-white/5 transition-all active:scale-95"
+          >
+            <Menu size={18} />
+          </button>
+          
+          {roomId ? (
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-mono text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded-lg tracking-wider truncate">
+                {roomId}
+              </span>
+              <span className="text-[11px] text-[#4c4e5e] font-medium hidden sm:inline">| Secured Channel</span>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Zap size={14} className="text-emerald-400 animate-pulse" />
+              <span className="text-xs font-bold tracking-wider text-[#828599] uppercase">Standby Connection Matrix</span>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
-          {userRole !== 'USER' && (
+        <div className="flex items-center gap-3">
+          {roomId && userRole === 'OWNER' && (
             <button
               onClick={onToggleMute}
-              className={`p-2 rounded-xl border transition-all duration-300 active:scale-[0.9] ${isMutedGlobally ? 'bg-red-500/10 border-red-500/20 text-red-400 shadow-md shadow-red-500/5' : 'bg-white/[0.02] border-white/5 text-[#828599] hover:text-white hover:border-white/10'}`}
-              title={isMutedGlobally ? "Unlock Room Transmission" : "Lock Room Transmission (Mute All Users)"}
+              className={`p-2 rounded-xl border transition-all ${
+                isMutedGlobally
+                  ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20'
+                  : 'bg-white/[0.01] text-[#828599] border-white/[0.04] hover:text-white hover:bg-white/5'
+              }`}
+              title={isMutedGlobally ? "Lift channel voice silence block" : "Enforce structural silence mute block"}
             >
-              {isMutedGlobally ? <VolumeX size={14} className="animate-pulse" /> : <Volume2 size={14} />}
+              {isMutedGlobally ? <VolumeX size={14} /> : <Volume2 size={14} />}
             </button>
           )}
 
-          <button
-            onClick={() => { navigator.clipboard.writeText(roomId); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 text-[#828599] text-xs font-bold transition-all duration-300 active:scale-[0.96]"
-          >
-            {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-            {copied ? 'KEY COPIED' : 'EXTRACT KEY'}
-          </button>
-          
-          {userRole === 'OWNER' && (
+          {roomId && userRole === 'OWNER' && (
             <button
-              onClick={() => setShowDestructModal(true)}
-              className="p-2 rounded-xl bg-red-500/5 border border-red-500/20 hover:bg-red-500/10 text-red-400 transition-all duration-300 active:scale-[0.9]"
-              title="Terminate Layer Connection"
+              onClick={onDestroyRoom}
+              className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all"
+              title="Purge layer node entirely"
             >
               <Trash2 size={14} />
             </button>
           )}
+
+          <div className="bg-[#151824] border border-white/[0.03] rounded-xl px-3 py-1.5 flex items-center gap-2 text-xs">
+            <span className="text-[#4c4e5e] font-medium">Node ID:</span>
+            {editingName ? (
+              <input
+                type="text"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onBlur={saveName}
+                onKeyDown={(e) => e.key === 'Enter' && saveName()}
+                autoFocus
+                className="bg-transparent text-white font-semibold border-none focus:outline-none w-20 sm:w-28 text-xs"
+              />
+            ) : (
+              <span
+                onClick={() => setEditingName(true)}
+                className="font-semibold text-emerald-400 cursor-pointer hover:underline truncate max-w-[80px] sm:max-w-[120px]"
+              >
+                {userName}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-5 space-y-4 scrollbar-thin">
-        {messages.map((msg) => {
-          if (msg.isSystem) {
-            return (
-              <div key={msg.id} className="flex justify-center my-2 animate-in fade-in zoom-in-95 duration-300 select-none">
-                <span className="text-[9px] tracking-wide font-mono bg-white/[0.02] border border-white/5 text-emerald-400/90 px-3 py-1 rounded-full font-bold shadow-sm">
-                  {msg.text}
-                </span>
-              </div>
-            );
-          }
-
-          const isOwn = msg.senderId === peerId;
-          const msgRole = msg.privilegeBadge || 'USER';
-
-          return (
-            <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-200`}>
-              <div className={`max-w-[65%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-                {!isOwn && (
-                  <span className="text-[10px] text-[#626475] mb-1 font-bold tracking-wide flex items-center gap-1.5">
-                    {msg.senderName}
-                    {msgRole === 'OWNER' && <span className="text-[7px] text-red-400 bg-red-500/5 px-1 rounded border border-red-500/10 font-black font-mono">HOST</span>}
-                    {msgRole === 'ADMIN' && <span className="text-[7px] text-amber-400 bg-amber-500/5 px-1 rounded border border-amber-500/10 font-black font-mono">ADMIN</span>}
-                  </span>
-                )}
-                <div className={`px-4 py-2.5 rounded-2xl text-xs font-medium leading-relaxed shadow-sm border transition-all duration-300 ${
-                  isOwn 
-                    ? 'bg-gradient-to-br from-emerald-600 to-emerald-700 text-white rounded-tr-none border-emerald-500/20 shadow-md shadow-emerald-950/10' 
-                    : 'bg-white/[0.02] text-[#c4c6d6] border-white/5 rounded-tl-none premium-glass'
-                }`}>
-                  {msg.text}
-                </div>
-                <span className="text-[9px] text-[#424454] font-bold mt-1 select-none font-mono">{formatTime(msg.timestamp)}</span>
-              </div>
+      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 scrollbar-thin scrollbar-thumb-white/5">
+        {roomId ? (
+          <>
+            <div className="mx-auto max-w-md text-center p-4 border border-white/[0.02] bg-[#0f111a]/30 rounded-2xl space-y-1 select-none mb-6">
+              <span className="text-[10px] font-bold text-emerald-400/80 tracking-widest uppercase block">Secure Connection Corridor Active</span>
+              <p className="text-[11px] text-[#4c4e5e] leading-relaxed px-2">Network streams are globally encrypted. Logs are persistent only while the terminal instance room remains live.</p>
             </div>
-          );
-        })}
-      </div>
 
-      <div className="px-5 py-0.5 text-[10px] text-emerald-400/60 font-medium h-4 min-h-4 select-none transition-all duration-300">
-        {typingUsers.length > 0 && (
-          <span className="flex items-center gap-1 animate-pulse font-mono text-[9px] tracking-wide">
-            ⚡ {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} writing message blocks...
-          </span>
+            {messages.map((msg) => {
+              const isMe = msg.senderId === peerId;
+              if (msg.isSystem) {
+                return (
+                  <div key={msg.id} className="flex justify-center select-none animate-in fade-in duration-200">
+                    <span className="text-[10px] font-mono tracking-wide text-[#4c4e5e] bg-white/[0.01] border border-white/[0.02] px-3 py-1 rounded-full uppercase">
+                      {msg.text}
+                    </span>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={msg.id} className={`flex flex-col max-w-[85%] sm:max-w-[70%] animate-in fade-in slide-in-from-bottom-2 duration-150 ${isMe ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
+                  <div className="flex items-center gap-1.5 mb-1 text-[10px] text-[#828599] px-1 select-none">
+                    <span className="font-bold text-white">{msg.senderName}</span>
+                    <span className={`text-[8px] font-extrabold tracking-wide px-1 rounded border ${
+                      msg.privilegeBadge === 'OWNER' 
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                        : msg.privilegeBadge === 'ADMIN' 
+                        ? 'bg-blue-500/10 text-blue-400 border-blue-400/20' 
+                        : 'bg-white/5 text-[#4c4e5e] border-white/5'
+                    }`}>
+                      {msg.privilegeBadge || 'PEER'}
+                    </span>
+                  </div>
+                  <div className={`rounded-2xl px-4 py-2.5 text-xs font-medium leading-relaxed break-words whitespace-pre-wrap ${
+                    isMe 
+                      ? 'bg-emerald-500 text-[#050508] font-semibold rounded-tr-none' 
+                      : 'bg-[#151824] text-white border border-white/[0.02] rounded-tl-none'
+                  }`}>
+                    {msg.text}
+                  </div>
+                </div>
+              );
+            })}
+
+            {typingUsers.length > 0 && (
+              <div className="flex items-center gap-2 text-[11px] text-[#4c4e5e] italic font-medium pl-1 animate-pulse select-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/40 animate-ping" />
+                <span>{typingUsers.join(', ')} typing stream response...</span>
+              </div>
+            )}
+            <div ref={scrollRef} />
+          </>
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-center max-w-sm mx-auto p-4 select-none animate-in fade-in zoom-in-95 duration-300">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mint-glow mb-4">
+              <Shield size={24} />
+            </div>
+            <h2 className="text-sm font-bold text-white tracking-wide uppercase">Zero-Trace Comms Portal</h2>
+            <p className="text-xs text-[#828599] leading-relaxed pt-2">Initialize a volatile network matrix channel or input a tracking connection sequence code via the utility terminal block.</p>
+          </div>
         )}
       </div>
 
-      <div className="border-t border-white/5 bg-[#0e1017]/40 backdrop-blur-md p-4">
-        <div className="flex items-center gap-3">
-          {showNameEdit ? (
-            <div className="flex items-center gap-2 flex-1 animate-in fade-in duration-200">
-              <input type="text" value={tempName} onChange={(e) => setTempName(e.target.value)} className="flex-1 bg-white/[0.02] border border-white/5 focus:border-emerald-500 focus:outline-none rounded-xl px-3 py-2 text-xs text-white font-medium" />
-              <button onClick={() => { if(tempName.trim()) { onSetUserName(tempName.trim()); setShowNameEdit(false); } }} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-[#050508] text-xs font-bold transition-colors">Save</button>
-            </div>
-          ) : (
-            <>
-              <button onClick={() => { setShowNameEdit(true); setTempName(userName); }} className="px-3 py-2.5 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] text-[#828599] hover:text-white text-xs font-bold truncate max-w-[120px] transition-all duration-200">{userName}</button>
-              <input
-                type="text"
-                value={inputText}
-                onChange={handleInputChange}
-                onKeyDown={(e) => { if(e.key==='Enter') handleSend(); }}
-                disabled={isMutedGlobally && userRole === 'USER'}
-                placeholder={isMutedGlobally && userRole === 'USER' ? "Transmission layer locked by administrators..." : "Type your message..."}
-                className="flex-1 bg-white/[0.02] border border-white/5 focus:border-emerald-500/30 focus:outline-none rounded-xl px-4 py-2.5 text-xs text-white font-medium disabled:opacity-40 transition-all duration-300"
-              />
-              <button onClick={handleSend} disabled={!inputText.trim() || (isMutedGlobally && userRole === 'USER')} className="w-9 h-9 rounded-xl bg-emerald-600 text-[#050508] flex items-center justify-center disabled:opacity-20 hover:bg-emerald-500 transition-all duration-300 shrink-0 active:scale-90 shadow-lg shadow-emerald-600/10"><Send size={14} /></button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {showDestructModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 select-none animate-in fade-in duration-200">
-          <div className="w-full max-w-sm bg-[#10111a] border border-white/5 rounded-2xl p-6 shadow-2xl text-center space-y-4 animate-in zoom-in-95 duration-200">
-            <div className="w-11 h-11 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto text-red-400">
-              <AlertTriangle size={20} className="animate-pulse" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-white tracking-wide uppercase">Execute Matrix Purge?</h3>
-              <p className="text-xs text-[#828599] mt-2 leading-relaxed">This completely clears current active database rows and deletes message vectors from memory pools. This action cannot be undone.</p>
-            </div>
-            <div className="flex gap-2.5 justify-center pt-1.5 text-xs font-bold">
-              <button onClick={() => setShowDestructModal(false)} className="px-4 py-2 rounded-xl border border-white/5 hover:bg-white/[0.02] text-[#626475] hover:text-white transition-colors">Abort</button>
-              <button onClick={() => { setShowDestructModal(false); onDestroyRoom?.(); }} className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white transition-all shadow-lg shadow-red-600/10 active:scale-95">Purge Channel</button>
-            </div>
-          </div>
+      {roomId && (
+        <div className="p-4 bg-[#0b0c10] shrink-0 border-t border-white/[0.04]">
+          <form onSubmit={handleSend} className="relative flex items-center max-w-5xl mx-auto">
+            <input
+              type="text"
+              placeholder={isMutedGlobally && (userRole === 'PEER' || userRole === 'USER') ? "Channel muted by structural grid matrix administrator..." : "Broadcasting real-time message packet..."}
+              value={inputText}
+              onChange={handleInputChange}
+              disabled={isMutedGlobally && (userRole === 'PEER' || userRole === 'USER')}
+              className="w-full bg-[#10121a] border border-white/[0.04] focus:border-emerald-500/30 rounded-xl pl-4 pr-12 py-3 text-xs text-white placeholder-[#4c4e5e] focus:outline-none transition-colors disabled:opacity-40 font-medium"
+            />
+            <button
+              type="submit"
+              disabled={(isMutedGlobally && (userRole === 'PEER' || userRole === 'USER')) || !inputText.trim()}
+              className="absolute right-2 p-2 rounded-lg bg-emerald-500 text-[#050508] hover:bg-emerald-400 transition-all disabled:opacity-0 disabled:scale-90 flex items-center justify-center active:scale-95"
+            >
+              <Send size={14} strokeWidth={2.5} />
+            </button>
+          </form>
         </div>
       )}
     </div>
