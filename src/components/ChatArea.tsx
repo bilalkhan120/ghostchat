@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Shield, Zap, Volume2, VolumeX, Trash2, Menu, ShieldCheck, EyeOff, Trash } from 'lucide-react';
+import { Send, Shield, Zap, Volume2, VolumeX, Trash2, Menu, ShieldCheck, EyeOff, Trash, Plus, Key, Copy, Check } from 'lucide-react';
 import type { ChatMessage } from '../types';
 
 interface ChatAreaProps {
@@ -18,6 +18,9 @@ interface ChatAreaProps {
   typingUsers: string[];
   onTypingStatusChange: (isTyping: boolean) => void;
   onOpenMobileMenu: () => void;
+  // Dynamic hooks injected to link home console events cleanly
+  onCreateRoomTrigger?: () => void;
+  onJoinRoomTrigger?: (id: string) => void;
 }
 
 export function ChatArea({
@@ -34,10 +37,15 @@ export function ChatArea({
   typingUsers,
   onTypingStatusChange,
   onOpenMobileMenu,
+  onCreateRoomTrigger,
+  onJoinRoomTrigger,
 }: ChatAreaProps) {
   const [inputText, setInputText] = useState('');
+  const [mobileJoinInput, setMobileJoinInput] = useState('');
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(userName);
+  const [copied, setCopied] = useState(false);
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<any>(null);
 
@@ -53,31 +61,29 @@ export function ChatArea({
     onTypingStatusChange(false);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputText(e.target.value);
-    onTypingStatusChange(true);
-
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      onTypingStatusChange(false);
-    }, 2000);
+  const handleMobileJoinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mobileJoinInput.trim() || !onJoinRoomTrigger) return;
+    onJoinRoomTrigger(mobileJoinInput.trim());
+    setMobileJoinInput('');
   };
 
-  const saveName = () => {
-    if (nameInput.trim()) {
-      onSetUserName(nameInput.trim());
-    }
-    setEditingName(false);
+  const executeLinkCopy = () => {
+    if (!roomId) return;
+    const shareUrl = `${window.location.origin}/?room=${roomId}`;
+    navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#0b0c10] relative h-full">
-      {/* Top Application Ribbon Layout Frame */}
+      {/* Top Application Header Section */}
       <div className="h-16 border-b border-white/[0.04] bg-[#0f111a]/80 backdrop-blur-md px-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <button 
             onClick={onOpenMobileMenu}
-            className="md:hidden p-2 rounded-xl text-[#828599] hover:text-white hover:bg-white/5 transition-all active:scale-95"
+            className="md:hidden p-2 rounded-xl text-[#828599] hover:text-white hover:bg-white/5 transition-all"
           >
             <Menu size={18} />
           </button>
@@ -87,12 +93,18 @@ export function ChatArea({
               <span className="font-mono text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded-lg tracking-wider truncate">
                 {roomId}
               </span>
-              <span className="text-[11px] text-[#4c4e5e] font-medium hidden sm:inline">| Secured Corridor</span>
+              <button 
+                onClick={executeLinkCopy}
+                className="p-1.5 rounded-lg text-[#828599] hover:text-white hover:bg-white/5 transition-colors"
+                title="Copy secure shortcut route URL"
+              >
+                {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+              </button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
               <Zap size={14} className="text-emerald-400 animate-pulse" />
-              <span className="text-xs font-bold tracking-wider text-[#828599] uppercase">Terminal Standby Matrix</span>
+              <span className="text-xs font-bold tracking-wider text-[#828599] uppercase">Terminal Grid Matrix</span>
             </div>
           )}
         </div>
@@ -102,22 +114,15 @@ export function ChatArea({
             <button
               onClick={onToggleMute}
               className={`p-2 rounded-xl border transition-all ${
-                isMutedGlobally
-                  ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20'
-                  : 'bg-white/[0.01] text-[#828599] border-white/[0.04] hover:text-white hover:bg-white/5'
+                isMutedGlobally ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-white/[0.01] text-[#828599] border-white/[0.04]'
               }`}
-              title={isMutedGlobally ? "Lift global silence rule" : "Enforce silence rule block"}
             >
               {isMutedGlobally ? <VolumeX size={14} /> : <Volume2 size={14} />}
             </button>
           )}
 
           {roomId && userRole === 'OWNER' && (
-            <button
-              onClick={onDestroyRoom}
-              className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all"
-              title="Purge completely from server index"
-            >
+            <button onClick={onDestroyRoom} className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20">
               <Trash2 size={14} />
             </button>
           )}
@@ -132,13 +137,10 @@ export function ChatArea({
                 onBlur={saveName}
                 onKeyDown={(e) => e.key === 'Enter' && saveName()}
                 autoFocus
-                className="bg-transparent text-white font-semibold border-none focus:outline-none w-20 sm:w-28 text-xs"
+                className="bg-transparent text-white font-semibold border-none focus:outline-none w-20 text-xs"
               />
             ) : (
-              <span
-                onClick={() => setEditingName(true)}
-                className="font-semibold text-emerald-400 cursor-pointer hover:underline truncate max-w-[80px] sm:max-w-[120px]"
-              >
+              <span onClick={() => setEditingName(true)} className="font-semibold text-emerald-400 cursor-pointer truncate max-w-[80px]">
                 {userName}
               </span>
             )}
@@ -149,16 +151,16 @@ export function ChatArea({
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 scrollbar-thin scrollbar-thumb-white/5">
         {roomId ? (
           <>
-            <div className="mx-auto max-w-md text-center p-4 border border-white/[0.02] bg-[#0f111a]/30 rounded-2xl space-y-1 select-none mb-6">
+            <div className="mx-auto max-w-md text-center p-4 border border-white/[0.02] bg-[#0f111a]/30 rounded-2xl space-y-1 mb-6">
               <span className="text-[10px] font-bold text-emerald-400/80 tracking-widest uppercase block">Secure Connection Corridor Active</span>
-              <p className="text-[11px] text-[#4c4e5e] leading-relaxed px-2">Network streams are globally encrypted. Logs are persistent only while the terminal instance room remains live.</p>
+              <p className="text-[11px] text-[#4c4e5e]">Network logs are fluid. Files will wipe completely when lifespan conditions end.</p>
             </div>
 
             {messages.map((msg) => {
               const isMe = msg.senderId === peerId;
               if (msg.isSystem) {
                 return (
-                  <div key={msg.id} className="flex justify-center select-none animate-in fade-in duration-200">
+                  <div key={msg.id} className="flex justify-center select-none">
                     <span className="text-[10px] font-mono tracking-wide text-[#4c4e5e] bg-white/[0.01] border border-white/[0.02] px-3 py-1 rounded-full uppercase">
                       {msg.text}
                     </span>
@@ -167,83 +169,64 @@ export function ChatArea({
               }
 
               return (
-                <div key={msg.id} className={`flex flex-col max-w-[85%] sm:max-w-[70%] animate-in fade-in slide-in-from-bottom-2 duration-150 ${isMe ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
-                  <div className="flex items-center gap-1.5 mb-1 text-[10px] text-[#828599] px-1 select-none">
+                <div key={msg.id} className={`flex flex-col max-w-[85%] sm:max-w-[70%] ${isMe ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
+                  <div className="flex items-center gap-1.5 mb-1 text-[10px] text-[#828599] px-1">
                     <span className="font-bold text-white">{msg.senderName}</span>
-                    <span className={`text-[8px] font-extrabold tracking-wide px-1 rounded border ${
-                      msg.privilegeBadge === 'OWNER' 
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                        : msg.privilegeBadge === 'ADMIN' 
-                        ? 'bg-blue-500/10 text-blue-400 border-blue-400/20' 
-                        : 'bg-white/5 text-[#4c4e5e] border-white/5'
-                    }`}>
-                      {msg.privilegeBadge || 'PEER'}
-                    </span>
+                    <span className="text-[8px] font-extrabold tracking-wide px-1 rounded border border-white/5 bg-white/5 text-[#4c4e5e]">{msg.privilegeBadge || 'PEER'}</span>
                   </div>
-                  <div className={`rounded-2xl px-4 py-2.5 text-xs font-medium leading-relaxed break-words whitespace-pre-wrap ${
-                    isMe 
-                      ? 'bg-emerald-500 text-[#050508] font-semibold rounded-tr-none' 
-                      : 'bg-[#151824] text-white border border-white/[0.02] rounded-tl-none'
-                  }`}>
+                  <div className={`rounded-2xl px-4 py-2.5 text-xs ${isMe ? 'bg-emerald-500 text-[#050508] font-semibold rounded-tr-none' : 'bg-[#151824] text-white border border-white/[0.02] rounded-tl-none'}`}>
                     {msg.text}
                   </div>
                 </div>
               );
             })}
-
-            {typingUsers.length > 0 && (
-              <div className="flex items-center gap-2 text-[11px] text-[#4c4e5e] italic font-medium pl-1 animate-pulse select-none">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/40 animate-ping" />
-                <span>{typingUsers.join(', ')} typing response stream...</span>
-              </div>
-            )}
             <div ref={scrollRef} />
           </>
         ) : (
-          /* Premium Comprehensive Welcome Landing Grid Framework for Desktop AND Smartphones */
-          <div className="w-full max-w-xl mx-auto space-y-8 py-4 px-2 animate-in fade-in zoom-in-95 duration-300">
-            <div className="text-center space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mint-glow mx-auto shadow-xl shadow-emerald-500/5">
-                <Shield size={26} />
+          /* Redesigned Responsive Home Viewport Dashboard Console */
+          <div className="w-full max-w-xl mx-auto space-y-6 py-2 px-1 animate-in fade-in zoom-in-95 duration-300">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mint-glow mx-auto shadow-lg">
+                <Shield size={22} />
               </div>
-              <div className="space-y-1">
-                <h2 className="text-base font-bold text-white tracking-wide uppercase">Zero-Trace Comms Matrix</h2>
-                <p className="text-xs text-[#828599] max-w-sm mx-auto leading-relaxed">Initialize an ephemeral network segment. Open a menu slot or toggle your sidebar node control panel to bind layers.</p>
-              </div>
+              <h2 className="text-sm font-bold text-white tracking-wide uppercase">Zero-Trace Comms Matrix</h2>
+              <p className="text-xs text-[#828599] max-w-xs mx-auto">Deploy a fresh communication segment node or establish a connection tunnel instantly.</p>
             </div>
 
-            {/* Mobile Feature Documentation Architecture Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-4 rounded-xl bg-[#0f111a] border border-white/[0.02] space-y-2">
-                <div className="flex items-center gap-2 text-emerald-400">
-                  <ShieldCheck size={16} />
-                  <span className="text-xs font-bold uppercase tracking-wider">Zero Log Storage</span>
-                </div>
-                <p className="text-[11px] text-[#828599] leading-relaxed">No tracking records or data parameters are ever backed up on servers. Messages survive purely inside the temporary room context timeline loop.</p>
-              </div>
+            {/* Injected Mobile Control Console Tray for Phone viewports */}
+            <div className="md:hidden block bg-[#0f111a] border border-white/[0.04] rounded-2xl p-4 space-y-3 shadow-xl">
+              <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest block text-center">Mobile Terminal Control Panel</span>
+              <button
+                onClick={onCreateRoomTrigger}
+                className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-[#050508] text-xs font-bold transition-all flex items-center justify-center gap-2"
+              >
+                <Plus size={14} strokeWidth={2.5} />
+                Create Volatile Room (Max 24h)
+              </button>
+              
+              <form onSubmit={handleMobileJoinSubmit} className="relative">
+                <input
+                  type="text"
+                  placeholder="Input Vector Core Identifier (GHOST-XXXX)"
+                  value={mobileJoinInput}
+                  onChange={(e) => setMobileJoinInput(e.target.value)}
+                  className="w-full bg-[#151824] border border-white/5 focus:border-emerald-500/30 rounded-xl pl-3 pr-10 py-2.5 text-xs text-white placeholder-[#4c4e5e] focus:outline-none"
+                />
+                <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-[#828599] hover:text-emerald-400 transition-colors">
+                  <Key size={14} />
+                </button>
+              </form>
+            </div>
 
-              <div className="p-4 rounded-xl bg-[#0f111a] border border-white/[0.02] space-y-2">
-                <div className="flex items-center gap-2 text-emerald-400">
-                  <EyeOff size={16} />
-                  <span className="text-xs font-bold uppercase tracking-wider">Masked Routing IDs</span>
-                </div>
-                <p className="text-[11px] text-[#828599] leading-relaxed">Every node connects using a dynamically generated network pseudonym handler. True machine endpoints are shielded behind secure layers.</p>
+            {/* Feature Description Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="p-4 rounded-xl bg-[#0f111a]/40 border border-white/[0.02] space-y-1.5">
+                <div className="flex items-center gap-2 text-emerald-400"><ShieldCheck size={14} /><span className="text-[11px] font-bold uppercase tracking-wider">Zero Log Storage</span></div>
+                <p className="text-[11px] text-[#828599] leading-relaxed">No tracking records or data arrays survive on servers. Messages are permanently wiped upon room closure.</p>
               </div>
-
-              <div className="p-4 rounded-xl bg-[#0f111a] border border-white/[0.02] space-y-2">
-                <div className="flex items-center gap-2 text-emerald-400">
-                  <VolumeX size={16} />
-                  <span className="text-xs font-bold uppercase tracking-wider">Admin Silencing</span>
-                </div>
-                <p className="text-[11px] text-[#828599] leading-relaxed">Channel owners retain extreme operational authority, enabling global stream mute commands or full core vector evictions instantly.</p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#0f111a] border border-white/[0.02] space-y-2">
-                <div className="flex items-center gap-2 text-emerald-400">
-                  <Trash size={16} />
-                  <span className="text-xs font-bold uppercase tracking-wider">Instant Core Purges</span>
-                </div>
-                <p className="text-[11px] text-[#828599] leading-relaxed">Whenever an administrative unit executes a manual room deletion or your target session time limit ends, data packets drop instantly.</p>
+              <div className="p-4 rounded-xl bg-[#0f111a]/40 border border-white/[0.02] space-y-1.5">
+                <div className="flex items-center gap-2 text-emerald-400"><EyeOff size={14} /><span className="text-[11px] font-bold uppercase tracking-wider">Masked Routing IDs</span></div>
+                <p className="text-[11px] text-[#828599] leading-relaxed">Every client uses dynamically spun random pseudonyms. Device addresses are scrubbed clean.</p>
               </div>
             </div>
           </div>
@@ -255,17 +238,13 @@ export function ChatArea({
           <form onSubmit={handleSend} className="relative flex items-center max-w-5xl mx-auto">
             <input
               type="text"
-              placeholder={isMutedGlobally && (userRole === 'PEER' || userRole === 'USER') ? "Channel muted by structural grid matrix administrator..." : "Broadcasting real-time message packet..."}
+              placeholder={isMutedGlobally && (userRole === 'PEER' || userRole === 'USER') ? "Channel muted by administrator layer..." : "Broadcasting real-time packet..."}
               value={inputText}
               onChange={handleInputChange}
               disabled={isMutedGlobally && (userRole === 'PEER' || userRole === 'USER')}
-              className="w-full bg-[#10121a] border border-white/[0.04] focus:border-emerald-500/30 rounded-xl pl-4 pr-12 py-3 text-xs text-white placeholder-[#4c4e5e] focus:outline-none transition-colors disabled:opacity-40 font-medium"
+              className="w-full bg-[#10121a] border border-white/[0.04] focus:border-emerald-500/30 rounded-xl pl-4 pr-12 py-3 text-xs text-white focus:outline-none transition-colors"
             />
-            <button
-              type="submit"
-              disabled={(isMutedGlobally && (userRole === 'PEER' || userRole === 'USER')) || !inputText.trim()}
-              className="absolute right-2 p-2 rounded-lg bg-emerald-500 text-[#050508] hover:bg-emerald-400 transition-all disabled:opacity-0 disabled:scale-90 flex items-center justify-center active:scale-95"
-            >
+            <button type="submit" disabled={!inputText.trim()} className="absolute right-2 p-2 rounded-lg bg-emerald-500 text-[#050508] flex items-center justify-center">
               <Send size={14} strokeWidth={2.5} />
             </button>
           </form>

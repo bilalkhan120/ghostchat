@@ -47,6 +47,44 @@ export default function App() {
     setIsMobileSidebarOpen(false);
   }, [roomId]);
 
+  // Global background daemon monitoring loop to track multi-room lifespans simultaneously
+  useEffect(() => {
+    if (activeRooms.length === 0) return;
+
+    const executeBackgroundSyncCheck = async () => {
+      // Query index to verify which rooms are still alive in database
+      const { data } = await supabase.from('rooms').select('id').in('id', activeRooms);
+      const aliveIds = data ? data.map(r => r.id) : [];
+
+      // Detect if any background history segments have expired naturally
+      const expiredRooms = activeRooms.filter(id => !aliveIds.includes(id));
+      
+      if (expiredRooms.length > 0) {
+        expiredRooms.forEach((deadId) => {
+          // If the currently open room just died, handle eviction cleanup routes
+          if (deadId === roomId) {
+            localStorage.removeItem('ghostchat_current_room');
+            setRoomId(null);
+            setAppNoticeMessage(`🕒 TIME LIMIT EXPIRED: Secure corridor segment [${deadId}] has reached its 24hr or configured decay boundary parameters and self-destructed completely.`);
+          } else {
+            // Push notification warning background alert to screen context 
+            setAppNoticeMessage(`⚠️ BACKGROUND VECTOR DECAYED: Your background session [${deadId}] has hit its maximum lifespan constraint and vanished from the index.`);
+          }
+          
+          // Scrub local arrays clean of dead elements
+          setActiveRooms((prev) => {
+            const filtered = prev.filter(id => id !== deadId);
+            localStorage.setItem('ghostchat_history_list', JSON.stringify(filtered));
+            return filtered;
+          });
+        });
+      }
+    };
+
+    const backgroundTrackerThread = setInterval(executeBackgroundSyncCheck, 5000);
+    return () => clearInterval(backgroundTrackerThread);
+  }, [activeRooms, roomId]);
+
   const { messages, addMessage, replaceHistory, clearMessages } = useVolatileChat(roomId, lifespanMinutes);
 
   const handleMessageReceived = useCallback((msg: ChatMessage) => { addMessage(msg); }, [addMessage]);
@@ -56,14 +94,7 @@ export default function App() {
   }, [replaceHistory]);
 
   const handleSystemAlert = useCallback((text: string) => {
-    addMessage({
-      id: nanoid(),
-      text,
-      senderId: 'SYSTEM',
-      senderName: 'SYSTEM',
-      timestamp: Date.now(),
-      isSystem: true
-    });
+    addMessage({ id: nanoid(), text, senderId: 'SYSTEM', senderName: 'SYSTEM', timestamp: Date.now(), isSystem: true });
   }, [addMessage]);
 
   const removeRoomFromHistory = useCallback((deadId: string) => {
@@ -76,19 +107,16 @@ export default function App() {
     setRoomId(null);
   }, []);
 
-  // Smart verification checks to output custom messages based on expiration reasons
   const handleForcedEvictionAction = useCallback(async (reason: string) => {
     if (!roomId) return;
     const trackingId = roomId;
     removeRoomFromHistory(trackingId);
 
-    // Look up the database to verify if room record still exists 
     const { data } = await supabase.from('rooms').select('id').eq('id', trackingId).maybeSingle();
-    
     if (!data) {
-      setAppNoticeMessage("🕒 TIME LIMIT EXPIRED: This volatile connection layer has reached its lifespan limit and self-destructed automatically from the global grid.");
+      setAppNoticeMessage(`🕒 TIME LIMIT EXPIRED: Volatile segment corridor [${trackingId}] reached its lifespan bound parameters and auto-destructed successfully.`);
     } else {
-      setAppNoticeMessage(`🔒 NODE TERMINATED: ${reason}`);
+      setAppNoticeMessage(`🔒 NODE TERMINATED MANUALLY: ${reason}`);
     }
   }, [roomId, removeRoomFromHistory]);
 
@@ -109,8 +137,6 @@ export default function App() {
         localStorage.setItem('ghostchat_history_list', JSON.stringify(updated));
         return updated;
       });
-    } else {
-      localStorage.removeItem('ghostchat_current_room');
     }
     clearMessages();
   }, [roomId, clearMessages]);
@@ -120,22 +146,10 @@ export default function App() {
     setLifespanMinutes(selectedLifespan);
     setRoomId(newRoomId);
 
-    await supabase.from('rooms').insert({
-      id: newRoomId,
-      lifespan_minutes: selectedLifespan,
-      admin_peer_id: peerId,
-      if_muted_globally: false
-    });
-
+    await supabase.from('rooms').insert({ id: newRoomId, lifespan_minutes: selectedLifespan, admin_peer_id: peerId, if_muted_globally: false });
     await supabase.from('messages').insert({
-      id: nanoid(),
-      room_id: newRoomId,
-      text: `👑 CORE MATRIX STACK LOGGED BY HOST OWNER (${userName})`,
-      sender_id: 'SYSTEM',
-      sender_name: 'SYSTEM',
-      timestamp: Date.now(),
-      if_system_message: true,
-      sender_privilege_badge: 'OWNER'
+      id: nanoid(), room_id: newRoomId, text: `👑 CORE MATRIX STACK LOGGED BY HOST OWNER (${userName})`,
+      sender_id: 'SYSTEM', sender_name: 'SYSTEM', timestamp: Date.now(), if_system_message: true, sender_privilege_badge: 'OWNER'
     });
 
     setShowCreateModal(false);
@@ -144,7 +158,7 @@ export default function App() {
   const handleJoinRoom = useCallback(async (id: string) => {
     const cleanId = id.trim().toUpperCase();
     if (!cleanId.startsWith('GHOST-')) {
-      setAppNoticeMessage('Invalid Vector Format. Code identifiers must use prefix sequence GHOST-XXXXX');
+      setAppNoticeMessage('Invalid Vector Format. Identifiers must use prefix GHOST-XXXXX');
       return;
     }
     
@@ -181,63 +195,37 @@ export default function App() {
   return (
     <div className="h-screen w-screen flex bg-[#0b0c10] text-white overflow-hidden font-sans selection:bg-emerald-500/30 relative">
       {isMobileSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden block transition-opacity duration-200"
-          onClick={() => setIsMobileSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden block transition-opacity duration-200" onClick={() => setIsMobileSidebarOpen(false)} />
       )}
 
       <Sidebar
-        currentRoomId={roomId}
-        rooms={activeRooms}
-        onCreateRoom={() => setShowCreateModal(true)}
-        onJoinRoom={handleJoinRoom}
-        onLeaveRoom={handleLeaveRoom}
-        connectedPeers={connectedPeers}
-        isConnecting={false}
-        activeUsersList={activeUsersList}
-        userRole={userRole}
-        onPromotionControl={handlePromotionControl}
-        isOpenMobile={isMobileSidebarOpen}
-        onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        currentRoomId={roomId} rooms={activeRooms} onCreateRoom={() => setShowCreateModal(true)} onJoinRoom={handleJoinRoom} onLeaveRoom={handleLeaveRoom}
+        connectedPeers={connectedPeers} isConnecting={false} activeUsersList={activeUsersList} userRole={userRole} onPromotionControl={handlePromotionControl}
+        isOpenMobile={isMobileSidebarOpen} onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
       <ChatArea
-        roomId={roomId}
-        messages={messages}
-        userName={userName}
-        peerId={peerId}
-        onSendMessage={handleSendMessage}
-        onSetUserName={handleSetUserName}
-        connectedPeers={connectedPeers}
-        onDestroyRoom={handleDestroyRoomAction}
-        roomLifespanMinutes={lifespanMinutes}
-        userRole={userRole}
-        isMutedGlobally={isMutedGlobally}
-        onToggleMute={toggleGlobalRoomMute}
-        typingUsers={typingUsers}
-        onTypingStatusChange={sendTypingStatus}
+        roomId={roomId} messages={messages} userName={userName} peerId={peerId} onSendMessage={handleSendMessage} onSetUserName={handleSetUserName}
+        connectedPeers={connectedPeers} onDestroyRoom={handleDestroyRoomAction} roomLifespanMinutes={lifespanMinutes} userRole={userRole}
+        isMutedGlobally={isMutedGlobally} onToggleMute={toggleGlobalRoomMute} typingUsers={typingUsers} onTypingStatusChange={sendTypingStatus}
         onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
+        onCreateRoomTrigger={() => setShowCreateModal(true)}
+        onJoinRoomTrigger={handleJoinRoom}
       />
-      {showCreateModal && (
-        <CreateRoomModal onClose={() => setShowCreateModal(false)} onCreate={handleCreateRoom} />
-      )}
+      {showCreateModal && <CreateRoomModal onClose={() => setShowCreateModal(false)} onCreate={handleCreateRoom} />}
 
       {appNoticeMessage && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 select-none animate-in fade-in duration-200 font-sans">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 select-none animate-in fade-in duration-200">
           <div className="w-full max-w-sm bg-[#10121a]/90 backdrop-blur-2xl border border-white/5 rounded-2xl p-6 shadow-2xl text-center space-y-4 animate-in zoom-in-95 duration-200">
             <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400 mint-glow">
               <ShieldAlert size={20} className="animate-pulse" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-sm font-bold text-white tracking-wide">Network Operation Alert</h3>
+              <h3 className="text-sm font-bold text-white tracking-wide">Network Matrix Operations Alert</h3>
               <p className="text-xs text-[#828599] leading-relaxed pt-1 px-1">{appNoticeMessage}</p>
             </div>
             <div className="pt-2">
-              <button 
-                onClick={() => setAppNoticeMessage(null)} 
-                className="w-full py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-[#050508] text-xs font-bold shadow-lg shadow-emerald-500/10 transition-all duration-200 active:scale-95"
-              >
-                Acknowledge Sequence
+              <button onClick={() => setAppNoticeMessage(null)} className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-[#050508] text-xs font-bold transition-all duration-200 active:scale-95">
+                Acknowledge Protocol Sequence
               </button>
             </div>
           </div>
