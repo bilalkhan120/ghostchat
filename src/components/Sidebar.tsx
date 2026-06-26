@@ -9,7 +9,6 @@ interface SidebarProps {
   onLeaveRoom: () => void;
   connectedPeers: number;
   isConnecting: boolean;
-  // Adjusted to match your exact project object structure
   activeUsersList: Array<{ peerId: string; [key: string]: any }>;
   userRole: string;
   onPromotionControl: (targetId: string, commandType: any) => void | Promise<void>;

@@ -31,8 +31,6 @@ export default function App() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [lifespanMinutes, setLifespanMinutes] = useState(60);
   const [appNoticeMessage, setAppNoticeMessage] = useState<string | null>(null);
-  
-  // Mobile responsive sidebar layout control tracking state
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
   const [activeRooms, setActiveRooms] = useState<string[]>(() => {
@@ -46,7 +44,6 @@ export default function App() {
     } else {
       document.title = `GhostChat // Secure Volatile Node`;
     }
-    // Auto-close responsive tray whenever you switch channels
     setIsMobileSidebarOpen(false);
   }, [roomId]);
 
@@ -79,11 +76,20 @@ export default function App() {
     setRoomId(null);
   }, []);
 
-  const handleForcedEvictionAction = useCallback((reason: string) => {
-    if (roomId) {
-      removeRoomFromHistory(roomId);
+  // Smart verification checks to output custom messages based on expiration reasons
+  const handleForcedEvictionAction = useCallback(async (reason: string) => {
+    if (!roomId) return;
+    const trackingId = roomId;
+    removeRoomFromHistory(trackingId);
+
+    // Look up the database to verify if room record still exists 
+    const { data } = await supabase.from('rooms').select('id').eq('id', trackingId).maybeSingle();
+    
+    if (!data) {
+      setAppNoticeMessage("🕒 TIME LIMIT EXPIRED: This volatile connection layer has reached its lifespan limit and self-destructed automatically from the global grid.");
+    } else {
+      setAppNoticeMessage(`🔒 NODE TERMINATED: ${reason}`);
     }
-    setAppNoticeMessage(reason);
   }, [roomId, removeRoomFromHistory]);
 
   const { peerId, connectedPeers, userRole, isMutedGlobally, activeUsersList, typingUsers, sendMessage, sendTypingStatus, handlePromotionControl, toggleGlobalRoomMute } = usePeerNetwork(
@@ -174,7 +180,6 @@ export default function App() {
 
   return (
     <div className="h-screen w-screen flex bg-[#0b0c10] text-white overflow-hidden font-sans selection:bg-emerald-500/30 relative">
-      {/* Dimmed mobile interaction shadow overlay shield backdrop */}
       {isMobileSidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden block transition-opacity duration-200"

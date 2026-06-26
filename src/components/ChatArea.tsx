@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Shield, Zap, Volume2, VolumeX, Trash2, Menu } from 'lucide-react';
+import { Send, Shield, Zap, Volume2, VolumeX, Trash2, Menu, ShieldCheck, EyeOff, Trash } from 'lucide-react';
 import type { ChatMessage } from '../types';
 
 interface ChatAreaProps {
@@ -12,7 +12,7 @@ interface ChatAreaProps {
   connectedPeers: number;
   onDestroyRoom: () => void;
   roomLifespanMinutes: number;
-  userRole: string; // Changed from strict literal to open string type
+  userRole: string;
   isMutedGlobally: boolean;
   onToggleMute: () => void;
   typingUsers: string[];
@@ -39,7 +39,7 @@ export function ChatArea({
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(userName);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = useRef<any>(null); // Avoid structural NodeJS conflicts
+  const typingTimeoutRef = useRef<any>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -72,6 +72,7 @@ export function ChatArea({
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[#0b0c10] relative h-full">
+      {/* Top Application Ribbon Layout Frame */}
       <div className="h-16 border-b border-white/[0.04] bg-[#0f111a]/80 backdrop-blur-md px-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <button 
@@ -86,12 +87,12 @@ export function ChatArea({
               <span className="font-mono text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded-lg tracking-wider truncate">
                 {roomId}
               </span>
-              <span className="text-[11px] text-[#4c4e5e] font-medium hidden sm:inline">| Secured Channel</span>
+              <span className="text-[11px] text-[#4c4e5e] font-medium hidden sm:inline">| Secured Corridor</span>
             </div>
           ) : (
             <div className="flex items-center gap-2">
               <Zap size={14} className="text-emerald-400 animate-pulse" />
-              <span className="text-xs font-bold tracking-wider text-[#828599] uppercase">Standby Connection Matrix</span>
+              <span className="text-xs font-bold tracking-wider text-[#828599] uppercase">Terminal Standby Matrix</span>
             </div>
           )}
         </div>
@@ -105,7 +106,7 @@ export function ChatArea({
                   ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20'
                   : 'bg-white/[0.01] text-[#828599] border-white/[0.04] hover:text-white hover:bg-white/5'
               }`}
-              title={isMutedGlobally ? "Lift channel voice silence block" : "Enforce structural silence mute block"}
+              title={isMutedGlobally ? "Lift global silence rule" : "Enforce silence rule block"}
             >
               {isMutedGlobally ? <VolumeX size={14} /> : <Volume2 size={14} />}
             </button>
@@ -115,7 +116,7 @@ export function ChatArea({
             <button
               onClick={onDestroyRoom}
               className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all"
-              title="Purge layer node entirely"
+              title="Purge completely from server index"
             >
               <Trash2 size={14} />
             </button>
@@ -193,18 +194,58 @@ export function ChatArea({
             {typingUsers.length > 0 && (
               <div className="flex items-center gap-2 text-[11px] text-[#4c4e5e] italic font-medium pl-1 animate-pulse select-none">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/40 animate-ping" />
-                <span>{typingUsers.join(', ')} typing stream response...</span>
+                <span>{typingUsers.join(', ')} typing response stream...</span>
               </div>
             )}
             <div ref={scrollRef} />
           </>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center max-w-sm mx-auto p-4 select-none animate-in fade-in zoom-in-95 duration-300">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mint-glow mb-4">
-              <Shield size={24} />
+          /* Premium Comprehensive Welcome Landing Grid Framework for Desktop AND Smartphones */
+          <div className="w-full max-w-xl mx-auto space-y-8 py-4 px-2 animate-in fade-in zoom-in-95 duration-300">
+            <div className="text-center space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mint-glow mx-auto shadow-xl shadow-emerald-500/5">
+                <Shield size={26} />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-base font-bold text-white tracking-wide uppercase">Zero-Trace Comms Matrix</h2>
+                <p className="text-xs text-[#828599] max-w-sm mx-auto leading-relaxed">Initialize an ephemeral network segment. Open a menu slot or toggle your sidebar node control panel to bind layers.</p>
+              </div>
             </div>
-            <h2 className="text-sm font-bold text-white tracking-wide uppercase">Zero-Trace Comms Portal</h2>
-            <p className="text-xs text-[#828599] leading-relaxed pt-2">Initialize a volatile network matrix channel or input a tracking connection sequence code via the utility terminal block.</p>
+
+            {/* Mobile Feature Documentation Architecture Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-4 rounded-xl bg-[#0f111a] border border-white/[0.02] space-y-2">
+                <div className="flex items-center gap-2 text-emerald-400">
+                  <ShieldCheck size={16} />
+                  <span className="text-xs font-bold uppercase tracking-wider">Zero Log Storage</span>
+                </div>
+                <p className="text-[11px] text-[#828599] leading-relaxed">No tracking records or data parameters are ever backed up on servers. Messages survive purely inside the temporary room context timeline loop.</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#0f111a] border border-white/[0.02] space-y-2">
+                <div className="flex items-center gap-2 text-emerald-400">
+                  <EyeOff size={16} />
+                  <span className="text-xs font-bold uppercase tracking-wider">Masked Routing IDs</span>
+                </div>
+                <p className="text-[11px] text-[#828599] leading-relaxed">Every node connects using a dynamically generated network pseudonym handler. True machine endpoints are shielded behind secure layers.</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#0f111a] border border-white/[0.02] space-y-2">
+                <div className="flex items-center gap-2 text-emerald-400">
+                  <VolumeX size={16} />
+                  <span className="text-xs font-bold uppercase tracking-wider">Admin Silencing</span>
+                </div>
+                <p className="text-[11px] text-[#828599] leading-relaxed">Channel owners retain extreme operational authority, enabling global stream mute commands or full core vector evictions instantly.</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#0f111a] border border-white/[0.02] space-y-2">
+                <div className="flex items-center gap-2 text-emerald-400">
+                  <Trash size={16} />
+                  <span className="text-xs font-bold uppercase tracking-wider">Instant Core Purges</span>
+                </div>
+                <p className="text-[11px] text-[#828599] leading-relaxed">Whenever an administrative unit executes a manual room deletion or your target session time limit ends, data packets drop instantly.</p>
+              </div>
+            </div>
           </div>
         )}
       </div>

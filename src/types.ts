@@ -5,7 +5,7 @@ export interface ChatMessage {
   senderName: string;
   timestamp: number;
   isSystem?: boolean;
-  privilegeBadge?: 'OWNER' | 'ADMIN' | 'USER';
+  privilegeBadge?: string;
 }
 
 export interface RoomState {
