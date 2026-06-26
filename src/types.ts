@@ -9,10 +9,10 @@ export interface ChatMessage {
 }
 
 export interface RoomState {
-  roomId: string;
+  id: string;
   lifespanMinutes: number;
   createdAt: number;
-  isMutedGlobally?: boolean;
+  isAdmin?: boolean;
 }
 
 export interface PeerMessage {

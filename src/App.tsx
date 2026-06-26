@@ -30,6 +30,9 @@ export default function App() {
   const [userName, setUserName] = useState<string>(getInitialUserName());
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [lifespanMinutes, setLifespanMinutes] = useState(60);
+  const [roomCreatedAt, setRoomCreatedAt] = useState<number | null>(null);
+  const [timeRemainingText, setTimeRemainingText] = useState('Calculating...');
+  const [isUrgentExpiry, setIsUrgentExpiry] = useState(false);
   const [appNoticeMessage, setAppNoticeMessage] = useState<string | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
@@ -39,39 +42,74 @@ export default function App() {
   });
 
   useEffect(() => {
-    if (roomId) {
-      document.title = `🔒 [${roomId}] Active Layer // GhostChat`;
-    } else {
-      document.title = `GhostChat // Secure Volatile Node`;
+    if (!roomId) {
+      setRoomCreatedAt(null);
+      setTimeRemainingText('Calculating...');
+      setIsUrgentExpiry(false);
+      return;
     }
-    setIsMobileSidebarOpen(false);
+
+    const fetchMetadata = async () => {
+      const { data } = await supabase.from('rooms').select('created_at, lifespan_minutes').eq('id', roomId).maybeSingle();
+      if (data) {
+        setRoomCreatedAt(new Date(data.created_at).getTime());
+        setLifespanMinutes(data.lifespan_minutes);
+      }
+    };
+    fetchMetadata();
   }, [roomId]);
 
-  // Global background daemon monitoring loop to track multi-room lifespans simultaneously
+  useEffect(() => {
+    if (!roomId || !roomCreatedAt) return;
+
+    const computeTimeVectorRemaining = () => {
+      const absoluteDeadline = roomCreatedAt + (lifespanMinutes * 60 * 1000);
+      const currentTime = Date.now();
+      const differenceMS = absoluteDeadline - currentTime;
+
+      if (differenceMS <= 0) {
+        setTimeRemainingText('EXPIRED');
+        setIsUrgentExpiry(true);
+        removeRoomFromHistory(roomId);
+        setAppNoticeMessage(`🕒 CORRIDOR EXPIRED: Secure room [${roomId}] has naturally reached its lifespan limit and has been scrubbed completely from the database.`);
+        return;
+      }
+
+      const totalSecsLeft = Math.floor(differenceMS / 1000);
+      const hrs = Math.floor(totalSecsLeft / 3600);
+      const mins = Math.floor((totalSecsLeft % 3600) / 60);
+      const secs = totalSecsLeft % 60;
+
+      setIsUrgentExpiry(totalSecsLeft <= 60);
+
+      const paddedMins = mins.toString().padStart(2, '0');
+      const paddedSecs = secs.toString().padStart(2, '0');
+      setTimeRemainingText(hrs > 0 ? `${hrs}h ${paddedMins}m ${paddedSecs}s` : `${paddedMins}m ${paddedSecs}s`);
+    };
+
+    computeTimeVectorRemaining();
+    const subSecondTimerTick = setInterval(computeTimeVectorRemaining, 1000);
+    return () => clearInterval(subSecondTimerTick);
+  }, [roomId, roomCreatedAt, lifespanMinutes]);
+
   useEffect(() => {
     if (activeRooms.length === 0) return;
 
-    const executeBackgroundSyncCheck = async () => {
-      // Query index to verify which rooms are still alive in database
+    const runBackgroundCheck = async () => {
       const { data } = await supabase.from('rooms').select('id').in('id', activeRooms);
       const aliveIds = data ? data.map(r => r.id) : [];
+      const deadRooms = activeRooms.filter(id => !aliveIds.includes(id));
 
-      // Detect if any background history segments have expired naturally
-      const expiredRooms = activeRooms.filter(id => !aliveIds.includes(id));
-      
-      if (expiredRooms.length > 0) {
-        expiredRooms.forEach((deadId) => {
-          // If the currently open room just died, handle eviction cleanup routes
+      if (deadRooms.length > 0) {
+        deadRooms.forEach((deadId) => {
           if (deadId === roomId) {
             localStorage.removeItem('ghostchat_current_room');
             setRoomId(null);
-            setAppNoticeMessage(`🕒 TIME LIMIT EXPIRED: Secure corridor segment [${deadId}] has reached its 24hr or configured decay boundary parameters and self-destructed completely.`);
+            setAppNoticeMessage(`🕒 TIME LIMIT EXPIRED: Volatile corridor [${deadId}] crossed its deadline threshold and self-destructed automatically.`);
           } else {
-            // Push notification warning background alert to screen context 
-            setAppNoticeMessage(`⚠️ BACKGROUND VECTOR DECAYED: Your background session [${deadId}] has hit its maximum lifespan constraint and vanished from the index.`);
+            setAppNoticeMessage(`⚠️ BACKGROUND CHANNEL PURGED: Your background session [${deadId}] hit its capacity lifespan parameters and dropped.`);
           }
           
-          // Scrub local arrays clean of dead elements
           setActiveRooms((prev) => {
             const filtered = prev.filter(id => id !== deadId);
             localStorage.setItem('ghostchat_history_list', JSON.stringify(filtered));
@@ -81,8 +119,8 @@ export default function App() {
       }
     };
 
-    const backgroundTrackerThread = setInterval(executeBackgroundSyncCheck, 5000);
-    return () => clearInterval(backgroundTrackerThread);
+    const backgroundSyncDaemon = setInterval(runBackgroundCheck, 6000);
+    return () => clearInterval(backgroundSyncDaemon);
   }, [activeRooms, roomId]);
 
   const { messages, addMessage, replaceHistory, clearMessages } = useVolatileChat(roomId, lifespanMinutes);
@@ -210,6 +248,8 @@ export default function App() {
         onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
         onCreateRoomTrigger={() => setShowCreateModal(true)}
         onJoinRoomTrigger={handleJoinRoom}
+        timeRemainingText={timeRemainingText}
+        isUrgentExpiry={isUrgentExpiry}
       />
       {showCreateModal && <CreateRoomModal onClose={() => setShowCreateModal(false)} onCreate={handleCreateRoom} />}
 
@@ -220,12 +260,12 @@ export default function App() {
               <ShieldAlert size={20} className="animate-pulse" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-sm font-bold text-white tracking-wide">Network Matrix Operations Alert</h3>
+              <h3 className="text-sm font-bold text-white tracking-wide">Network Operation Alert</h3>
               <p className="text-xs text-[#828599] leading-relaxed pt-1 px-1">{appNoticeMessage}</p>
             </div>
             <div className="pt-2">
               <button onClick={() => setAppNoticeMessage(null)} className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-[#050508] text-xs font-bold transition-all duration-200 active:scale-95">
-                Acknowledge Protocol Sequence
+                Acknowledge Sequence
               </button>
             </div>
           </div>
