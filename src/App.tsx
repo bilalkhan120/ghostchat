@@ -123,11 +123,10 @@ export default function App() {
     return () => clearInterval(backgroundSyncDaemon);
   }, [activeRooms, roomId]);
 
-  const { messages, addMessage, replaceHistory, clearMessages } = useVolatileChat(roomId, lifespanMinutes);
+  const { messages, addMessage, addReaction, replaceHistory, clearMessages } = useVolatileChat(roomId, lifespanMinutes);
 
   const handleMessageReceived = useCallback((msg: ChatMessage) => { addMessage(msg); }, [addMessage]);
   
-  // FIX 1: Sync room creation time directly from the history payload so "Calculating..." clears instantly on refresh
   const handleHistoryReceived = useCallback((newMessages: ChatMessage[], roomState: RoomState) => {
     replaceHistory(newMessages, roomState);
     setLifespanMinutes(roomState.lifespanMinutes);
@@ -137,6 +136,10 @@ export default function App() {
   const handleSystemAlert = useCallback((text: string) => {
     addMessage({ id: nanoid(), text, senderId: 'SYSTEM', senderName: 'SYSTEM', timestamp: Date.now(), isSystem: true });
   }, [addMessage]);
+
+  const handleReactionReceived = useCallback((messageId: string, emoji: string, reactorId: string) => {
+    addReaction(messageId, emoji, reactorId);
+  }, [addReaction]);
 
   const removeRoomFromHistory = useCallback((deadId: string) => {
     setActiveRooms((prev) => {
@@ -161,8 +164,8 @@ export default function App() {
     }
   }, [roomId, removeRoomFromHistory]);
 
-  const { peerId, connectedPeers, userRole, isMutedGlobally, activeUsersList, typingUsers, sendMessage, sendTypingStatus, handlePromotionControl, toggleGlobalRoomMute } = usePeerNetwork(
-    roomId, userName, handleMessageReceived, handleHistoryReceived, handleSystemAlert, handleForcedEvictionAction
+  const { peerId, connectedPeers, userRole, isMutedGlobally, activeUsersList, typingUsers, sendMessage, sendReaction, sendTypingStatus, handlePromotionControl, toggleGlobalRoomMute } = usePeerNetwork(
+    roomId, userName, handleMessageReceived, handleHistoryReceived, handleSystemAlert, handleForcedEvictionAction, handleReactionReceived
   );
 
   const handleSetUserName = useCallback((newName: string) => {
@@ -185,8 +188,6 @@ export default function App() {
   const handleCreateRoom = useCallback(async (selectedLifespan: number) => {
     const newRoomId = generateRoomId();
     
-    // FIX 2: Await the database insert completely BEFORE setting the local state.
-    // This entirely prevents the race condition that causes "Calculating..." and room crashes.
     await supabase.from('rooms').insert({ id: newRoomId, lifespan_minutes: selectedLifespan, admin_peer_id: peerId, if_muted_globally: false });
     await supabase.from('messages').insert({
       id: nanoid(), room_id: newRoomId, text: `👑 CORE MATRIX STACK LOGGED BY HOST OWNER (${userName})`,
@@ -222,9 +223,9 @@ export default function App() {
     setRoomId(null);
   }, []);
 
-  const handleSendMessage = useCallback((text: string, isSystem = false) => {
+  const handleSendMessage = useCallback((text: string, replyToId?: string, isSystem = false) => {
     if (!roomId || !peerId) return;
-    const msg: ChatMessage = { id: nanoid(), text, senderId: peerId, senderName: userName, timestamp: Date.now(), isSystem, privilegeBadge: userRole };
+    const msg: ChatMessage = { id: nanoid(), text, senderId: peerId, senderName: userName, timestamp: Date.now(), isSystem, privilegeBadge: userRole, replyToId, reactions: {} };
     addMessage(msg);
     sendMessage(msg);
   }, [roomId, peerId, userName, userRole, addMessage, sendMessage]);
@@ -237,8 +238,6 @@ export default function App() {
   }, [roomId, userRole, removeRoomFromHistory]);
 
   return (
-    // FIX 3: Replaced "h-screen w-screen" with "fixed inset-0 h-[100dvh] w-full". 
-    // This forces the mobile browser address bar to stop pushing the top header off the screen!
     <div className="fixed inset-0 h-[100dvh] w-full flex bg-[#0b0c10] text-white overflow-hidden font-sans selection:bg-emerald-500/30">
       {isMobileSidebarOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden block transition-opacity duration-200" onClick={() => setIsMobileSidebarOpen(false)} />
@@ -250,7 +249,7 @@ export default function App() {
         isOpenMobile={isMobileSidebarOpen} onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
       <ChatArea
-        roomId={roomId} messages={messages} userName={userName} peerId={peerId} onSendMessage={handleSendMessage} onSetUserName={handleSetUserName}
+        roomId={roomId} messages={messages} userName={userName} peerId={peerId} onSendMessage={handleSendMessage} onSetUserName={handleSetUserName} onSendReaction={sendReaction}
         connectedPeers={connectedPeers} onDestroyRoom={handleDestroyRoomAction} roomLifespanMinutes={lifespanMinutes} userRole={userRole}
         isMutedGlobally={isMutedGlobally} onToggleMute={toggleGlobalRoomMute} typingUsers={typingUsers} onTypingStatusChange={sendTypingStatus}
         onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}

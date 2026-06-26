@@ -6,6 +6,8 @@ export interface ChatMessage {
   timestamp: number;
   isSystem?: boolean;
   privilegeBadge?: string;
+  replyToId?: string;
+  reactions?: Record<string, string[]>;
 }
 
 export interface RoomState {
@@ -16,7 +18,7 @@ export interface RoomState {
 }
 
 export interface PeerMessage {
-  type: 'chat' | 'peer_joined' | 'kick_peer' | 'promote_peer' | 'demote_peer' | 'toggle_mute_room' | 'typing_status';
+  type: 'chat' | 'peer_joined' | 'kick_peer' | 'promote_peer' | 'demote_peer' | 'toggle_mute_room' | 'typing_status' | 'message_reaction';
   payload: {
     message?: ChatMessage;
     messages?: ChatMessage[];
@@ -26,5 +28,7 @@ export interface PeerMessage {
     targetId?: string;
     isMuted?: boolean;
     isTyping?: boolean;
+    messageId?: string;
+    reaction?: string;
   };
 }

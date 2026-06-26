@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Shield, Zap, Volume2, VolumeX, Trash2, Menu, Plus, Key, Copy, Check, Clock, MoreVertical, Lock, UserX, ServerOff, ChevronRight } from 'lucide-react';
+import { Send, Shield, Zap, Volume2, VolumeX, Trash2, Menu, Plus, Copy, Check, Clock, MoreVertical, Lock, UserX, ServerOff, ChevronRight, X, MessageSquareReply } from 'lucide-react';
 import type { ChatMessage } from '../types';
 
 interface ChatAreaProps {
@@ -7,7 +7,7 @@ interface ChatAreaProps {
   messages: ChatMessage[];
   userName: string;
   peerId: string | null;
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, replyToId?: string) => void;
   onSetUserName: (name: string) => void;
   connectedPeers: number;
   onDestroyRoom: () => void;
@@ -22,6 +22,7 @@ interface ChatAreaProps {
   onJoinRoomTrigger?: (id: string) => void;
   timeRemainingText?: string;
   isUrgentExpiry?: boolean;
+  onSendReaction?: (messageId: string, emoji: string) => void;
 }
 
 export function ChatArea({
@@ -42,6 +43,7 @@ export function ChatArea({
   onJoinRoomTrigger,
   timeRemainingText = "Calculating...",
   isUrgentExpiry = false,
+  onSendReaction
 }: ChatAreaProps) {
   const [inputText, setInputText] = useState('');
   const [mobileJoinInput, setMobileJoinInput] = useState('');
@@ -49,6 +51,9 @@ export function ChatArea({
   const [nameInput, setNameInput] = useState(userName);
   const [copied, setCopied] = useState(false);
   const [showMobileAdminOptions, setShowMobileAdminOptions] = useState(false);
+  
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<any>(null);
@@ -60,8 +65,9 @@ export function ChatArea({
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
-    onSendMessage(inputText);
+    onSendMessage(inputText, replyingTo?.id);
     setInputText('');
+    setReplyingTo(null);
     onTypingStatusChange(false);
   };
 
@@ -96,6 +102,7 @@ export function ChatArea({
   return (
     <div className={`flex-1 flex flex-col min-w-0 bg-[#0b0c10] relative h-full transition-all duration-300
       ${isUrgentExpiry ? 'border-t-2 border-t-red-500 shadow-[inset_0_5px_15px_rgba(239,68,68,0.1)]' : ''}`}
+      onClick={() => setSelectedMessageId(null)}
     >
       <div className="h-16 border-b border-white/[0.04] bg-[#0f111a]/80 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -175,6 +182,9 @@ export function ChatArea({
           <div className="px-4 py-6 space-y-4">
             {messages.map((msg) => {
               const isMe = msg.senderId === peerId;
+              const isSelected = selectedMessageId === msg.id;
+              const repliedMsg = msg.replyToId ? messages.find(m => m.id === msg.replyToId) : null;
+
               if (msg.isSystem) {
                 return (
                   <div key={msg.id} className="flex justify-center select-none animate-in fade-in duration-150">
@@ -191,8 +201,43 @@ export function ChatArea({
                     <span className="font-bold text-white">{msg.senderName}</span>
                     <span className="text-[8px] font-extrabold tracking-wide px-1 rounded border border-white/5 bg-white/5 text-[#4c4e5e]">{msg.privilegeBadge || 'PEER'}</span>
                   </div>
-                  <div className={`rounded-2xl px-4 py-2.5 text-xs ${isMe ? 'bg-emerald-500 text-[#050508] font-semibold rounded-tr-none' : 'bg-[#151824] text-white border border-white/[0.02] rounded-tl-none break-words'}`}>
-                    {msg.text}
+                  
+                  <div className="relative group cursor-pointer" onClick={(e) => { e.stopPropagation(); setSelectedMessageId(isSelected ? null : msg.id); }}>
+                    
+                    {repliedMsg && (
+                      <div className="mb-1 px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 text-[10px] text-[#828599] truncate max-w-full opacity-80 border-l-2 border-l-emerald-500/50">
+                        <span className="font-bold text-emerald-400 block mb-0.5">{repliedMsg.senderName}</span>
+                        {repliedMsg.text}
+                      </div>
+                    )}
+
+                    <div className={`rounded-2xl px-4 py-2.5 text-xs relative ${isMe ? 'bg-emerald-500 text-[#050508] font-semibold rounded-tr-none' : 'bg-[#151824] text-white border border-white/[0.02] rounded-tl-none break-words'}`}>
+                      {msg.text}
+                    </div>
+                    
+                    {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                      <div className={`absolute -bottom-3 ${isMe ? 'right-2' : 'left-2'} flex gap-1 z-10`}>
+                        {Object.entries(msg.reactions).map(([emoji, users]) => (
+                          <span key={emoji} className="bg-[#10121a] border border-white/10 rounded-full px-1.5 py-0.5 text-[10px] flex items-center gap-1 shadow-lg">
+                            {emoji} <span className="text-[#828599] text-[8px]">{users.length}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {isSelected && (
+                      <div className={`absolute top-full mt-2 ${isMe ? 'right-0' : 'left-0'} bg-[#151824] border border-white/10 rounded-xl p-1.5 flex items-center gap-1 shadow-2xl z-20 animate-in zoom-in-95`}>
+                        {['👍', '🔥', '😂', '👀'].map(emoji => (
+                          <button key={emoji} onClick={(e) => { e.stopPropagation(); onSendReaction?.(msg.id, emoji); setSelectedMessageId(null); }} className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-sm">
+                            {emoji}
+                          </button>
+                        ))}
+                        <div className="w-px h-4 bg-white/10 mx-1"></div>
+                        <button onClick={(e) => { e.stopPropagation(); setReplyingTo(msg); setSelectedMessageId(null); }} className="text-[#828599] hover:text-white p-1.5 rounded-lg transition-colors flex items-center gap-1 text-[10px] font-bold">
+                          <MessageSquareReply size={12} /> Reply
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -207,12 +252,7 @@ export function ChatArea({
             <div ref={scrollRef} />
           </div>
         ) : (
-          /* =========================================================
-             🔥 THE NEW MARKETING LANDING PAGE (HERO + BANNERS) 🔥
-             ========================================================= */
           <div className="w-full max-w-5xl mx-auto px-6 py-12 md:py-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            
-            {/* 1. Above-The-Fold Hook */}
             <div className="text-center space-y-6 max-w-2xl mx-auto mb-16">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-widest mb-4">
                 <Zap size={12} className="animate-pulse" /> Live Now: V2 Protocol
@@ -225,7 +265,6 @@ export function ChatArea({
               </p>
             </div>
 
-            {/* 2. Call-To-Action (CTA) Console */}
             <div className="max-w-md mx-auto bg-[#0f111a] border border-white/[0.04] rounded-3xl p-6 shadow-2xl mb-20 relative overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400/0 via-emerald-400 to-emerald-400/0 opacity-50" />
               
@@ -259,7 +298,6 @@ export function ChatArea({
               </div>
             </div>
 
-            {/* 3. The Feature Grid Banners */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
               <div className="p-6 rounded-3xl bg-[#0f111a]/40 border border-white/[0.02] hover:bg-[#0f111a] hover:border-emerald-500/20 transition-all duration-300 group">
                 <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-white mb-4 group-hover:scale-110 group-hover:bg-emerald-500/10 group-hover:text-emerald-400 group-hover:border-emerald-500/20 transition-all">
@@ -291,14 +329,24 @@ export function ChatArea({
                 </p>
               </div>
             </div>
-
           </div>
         )}
       </div>
 
       {roomId && (
-        <div className="p-3 sm:p-4 bg-[#0b0c10] shrink-0 border-t border-white/[0.04]">
-          <form onSubmit={handleSend} className="relative flex items-center max-w-5xl mx-auto">
+        <div className="p-3 sm:p-4 bg-[#0b0c10] shrink-0 border-t border-white/[0.04] flex flex-col">
+          {replyingTo && (
+            <div className="mb-2 bg-[#151824] border border-emerald-500/30 rounded-xl p-2.5 flex items-start justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 shadow-lg">
+              <div className="min-w-0 flex-1 border-l-2 border-emerald-500 pl-2">
+                <span className="text-[10px] font-bold text-emerald-400 block mb-0.5 truncate">Replying to {replyingTo.senderName}</span>
+                <p className="text-xs text-[#828599] truncate">{replyingTo.text}</p>
+              </div>
+              <button onClick={() => setReplyingTo(null)} className="p-1 text-[#4c4e5e] hover:text-white rounded-lg transition-colors shrink-0 bg-white/5 hover:bg-red-500/20 hover:text-red-400">
+                <X size={14} />
+              </button>
+            </div>
+          )}
+          <form onSubmit={handleSend} className="relative flex items-center max-w-5xl mx-auto w-full">
             <input
               type="text"
               placeholder={isMutedGlobally && (userRole === 'PEER' || userRole === 'USER') ? "Channel muted by admin..." : "Broadcasting packet..."}

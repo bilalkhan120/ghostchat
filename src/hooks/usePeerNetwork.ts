@@ -19,7 +19,8 @@ export function usePeerNetwork(
   onMessageReceived: (msg: ChatMessage) => void,
   onHistoryReceived: (messages: ChatMessage[], roomState: RoomState) => void,
   onSystemAlert: (text: string) => void,
-  onForcedEviction: (reason: string) => void
+  onForcedEviction: (reason: string) => void,
+  onReactionReceived: (messageId: string, emoji: string, reactorId: string) => void
 ) {
   const [peerId] = useState<string>(() => {
     const saved = localStorage.getItem('ghostchat_peer_id');
@@ -85,13 +86,15 @@ export function usePeerNetwork(
           senderName: m.sender_name,
           timestamp: m.timestamp,
           isSystem: m.if_system_message,
-          privilegeBadge: m.sender_privilege_badge
+          privilegeBadge: m.sender_privilege_badge,
+          replyToId: m.reply_to_id,
+          reactions: m.reactions || {}
         }));
         onHistoryReceived(formattedMessages, {
-          roomId: targetRoomId,
+          id: targetRoomId,
           lifespanMinutes: roomData.lifespan_minutes,
           createdAt: new Date(roomData.created_at).getTime(),
-          isMutedGlobally: roomData.if_muted_globally
+          isAdmin: calculatedRole === 'OWNER'
         });
       }
     } catch (err) {
@@ -171,6 +174,11 @@ export function usePeerNetwork(
           return;
         }
 
+        if (msg.type === 'message_reaction' && msg.payload.messageId && msg.payload.reaction && msg.payload.peerId) {
+          onReactionReceived(msg.payload.messageId, msg.payload.reaction, msg.payload.peerId);
+          return;
+        }
+
         if (data.senderPeerId === peerId) return;
 
         if (msg.type === 'peer_joined' && msg.payload.peerId && msg.payload.peerName) {
@@ -237,7 +245,7 @@ export function usePeerNetwork(
       setActiveUsersList([]);
       setTypingUsers([]);
     };
-  }, [roomId, peerId, userName, onMessageReceived, broadcast, loadRoomHistory, executeLazyCleanup, onSystemAlert, onForcedEviction]);
+  }, [roomId, peerId, userName, onMessageReceived, onReactionReceived, broadcast, loadRoomHistory, executeLazyCleanup, onSystemAlert, onForcedEviction]);
 
   const sendMessage = useCallback(async (message: ChatMessage) => {
     if (!roomId) return;
@@ -251,13 +259,35 @@ export function usePeerNetwork(
       sender_name: message.senderName,
       timestamp: message.timestamp,
       if_system_message: message.isSystem || false,
-      sender_privilege_badge: message.privilegeBadge || 'USER'
+      sender_privilege_badge: message.privilegeBadge || 'USER',
+      reply_to_id: message.replyToId || null,
+      reactions: message.reactions || {}
     });
   }, [roomId, broadcast]);
 
+  const sendReaction = useCallback(async (messageId: string, emoji: string) => {
+    if (!roomId) return;
+    broadcast({ type: 'message_reaction', payload: { messageId, reaction: emoji, peerId } });
+    
+    const { data } = await supabase.from('messages').select('reactions').eq('id', messageId).single();
+    if (data) {
+      const currentReactions = data.reactions || {};
+      let userList = currentReactions[emoji] || [];
+      if (userList.includes(peerId)) {
+        userList = userList.filter((id: string) => id !== peerId);
+      } else {
+        userList = [...userList, peerId];
+      }
+      
+      currentReactions[emoji] = userList;
+      if (userList.length === 0) delete currentReactions[emoji];
+      
+      await supabase.from('messages').update({ reactions: currentReactions }).eq('id', messageId);
+    }
+  }, [roomId, peerId, broadcast]);
+
   const handlePromotionControl = useCallback(async (targetId: string, commandType: 'PROMOTE' | 'DEMOTE' | 'KICK') => {
     if (userRole === 'USER') return;
-    
     if (commandType === 'PROMOTE') {
       broadcast({ type: 'promote_peer', payload: { targetId } });
     } else if (commandType === 'DEMOTE') {
@@ -265,8 +295,6 @@ export function usePeerNetwork(
     } else if (commandType === 'KICK') {
       broadcast({ type: 'kick_peer', payload: { peerId: targetId } });
     }
-    
-    // Force instant directory list synchronization updates across hosts layout
     setTimeout(() => {
       broadcast({ type: 'peer_joined', payload: { peerId, peerName: userName } });
     }, 400);
@@ -294,6 +322,7 @@ export function usePeerNetwork(
     activeUsersList,
     typingUsers,
     sendMessage,
+    sendReaction,
     sendTypingStatus,
     handlePromotionControl,
     toggleGlobalRoomMute,

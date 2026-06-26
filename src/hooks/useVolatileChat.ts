@@ -20,10 +20,9 @@ export function useVolatileChat(roomId: string | null, lifespanMinutes: number) 
       return;
     }
 
-    const intervalMs = 3000; // Fast 3-second cycle for precise decay tracking
+    const intervalMs = 3000;
     timerRef.current = setInterval(() => {
       const now = Date.now();
-      // Added absolute boundary baseline to prevent race conditions during 1-min durations
       const safeLifespan = Math.max(1, lifespanMinutes);
       const maxAgeMs = safeLifespan * 60 * 1000;
       
@@ -51,6 +50,34 @@ export function useVolatileChat(roomId: string | null, lifespanMinutes: number) 
     });
   }, []);
 
+  const addReaction = useCallback((messageId: string, emoji: string, peerId: string) => {
+    setMessages((prev) => {
+      return prev.map((msg) => {
+        if (msg.id !== messageId) return msg;
+        
+        const currentReactions = msg.reactions || {};
+        const userList = currentReactions[emoji] || [];
+        
+        let newUserList;
+        if (userList.includes(peerId)) {
+          newUserList = userList.filter(id => id !== peerId);
+        } else {
+          newUserList = [...userList, peerId];
+        }
+
+        const updatedReactions = { ...currentReactions, [emoji]: newUserList };
+        if (newUserList.length === 0) delete updatedReactions[emoji];
+
+        const updatedMsg = { ...msg, reactions: updatedReactions };
+        
+        const nextRef = messagesRef.current.map(m => m.id === messageId ? updatedMsg : m);
+        messagesRef.current = nextRef;
+        
+        return updatedMsg;
+      });
+    });
+  }, []);
+
   const replaceHistory = useCallback((newMessages: ChatMessage[], roomState: RoomState) => {
     const now = Date.now();
     const safeLifespan = Math.max(1, roomState.lifespanMinutes);
@@ -73,6 +100,7 @@ export function useVolatileChat(roomId: string | null, lifespanMinutes: number) 
     messages,
     messagesRef,
     addMessage,
+    addReaction,
     replaceHistory,
     clearMessages,
     roomStateRef,
