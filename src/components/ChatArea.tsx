@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Shield, Zap, Volume2, VolumeX, Trash2, Menu, Plus, Copy, Check, Clock, MoreVertical, Lock, UserX, ServerOff, ChevronRight, X, MessageSquareReply } from 'lucide-react';
+import { Send, Shield, Zap, Volume2, VolumeX, Trash2, Menu, Plus, Copy, Check, Clock, MoreVertical, Lock, UserX, ServerOff, X, MessageSquareReply } from 'lucide-react';
 import type { ChatMessage } from '../types';
 
 interface ChatAreaProps {
