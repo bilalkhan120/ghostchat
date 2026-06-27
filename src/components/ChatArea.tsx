@@ -285,15 +285,15 @@ export function ChatArea({
                   <div className="flex-grow border-t border-white/[0.05]"></div>
                 </div>
 
-                <form onSubmit={handleMobileJoin} className="flex gap-2">
+                <form onSubmit={handleMobileJoin} className="relative flex items-center w-full">
                   <input
                     type="text"
-                    placeholder="Input Room ID"
+                    placeholder="Enter Room ID"
                     value={mobileJoinInput}
                     onChange={(e) => setMobileJoinInput(e.target.value)}
-                    className="flex-1 bg-[#151824] border border-white/5 focus:border-emerald-500/30 rounded-2xl px-4 py-3.5 text-sm text-white focus:outline-none transition-all placeholder:text-[#4c4e5e]"
+                    className="w-full bg-[#151824] border border-white/5 focus:border-emerald-500/30 rounded-2xl pl-4 pr-24 py-3.5 text-sm text-white focus:outline-none transition-all placeholder:text-[#4c4e5e]"
                   />
-                  <button type="submit" className="px-6 bg-white/5 hover:bg-emerald-500 hover:text-black rounded-2xl text-[#828599] text-xs font-bold transition-all">
+                  <button type="submit" className="absolute right-1.5 px-4 py-2 bg-white/5 hover:bg-emerald-500 hover:text-[#050508] rounded-xl text-[#828599] text-[10px] sm:text-xs font-bold tracking-wider transition-all">
                     JOIN
                   </button>
                 </form>
@@ -343,7 +343,7 @@ export function ChatArea({
                 <span className="text-[10px] font-bold text-emerald-400 block mb-0.5 truncate">Replying to {replyingTo.senderName}</span>
                 <p className="text-xs text-[#828599] truncate">{replyingTo.text}</p>
               </div>
-              <button onClick={() => setReplyingTo(null)} className="p-1 text-[#4c4e5e] hover:text-white rounded-lg transition-colors shrink-0 bg-white/5 hover:bg-red-500/20 hover:text-red-400">
+              <button onClick={() => setReplyingTo(null)} className="p-1 text-[#4c4e5e] rounded-lg transition-colors shrink-0 bg-white/5 hover:bg-red-500/20 hover:text-red-400">
                 <X size={14} />
               </button>
             </div>
