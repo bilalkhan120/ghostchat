@@ -20,7 +20,8 @@ export function usePeerNetwork(
   onHistoryReceived: (messages: ChatMessage[], roomState: RoomState) => void,
   onSystemAlert: (text: string) => void,
   onForcedEviction: (reason: string) => void,
-  onReactionReceived: (messageId: string, emoji: string, reactorId: string) => void
+  onReactionReceived: (messageId: string, emoji: string, reactorId: string) => void,
+  onRoomRotated: (newRoomId: string) => void
 ) {
   const [peerId] = useState<string>(() => {
     const saved = localStorage.getItem('ghostchat_peer_id');
@@ -136,6 +137,11 @@ export function usePeerNetwork(
         const senderId = data.senderPeerId;
         const msg: PeerMessage = data.payload;
 
+        if (msg.type === 'rotate_room' && msg.payload.newRoomId) {
+          onRoomRotated(msg.payload.newRoomId);
+          return;
+        }
+
         if (msg.type === 'kick_peer' && msg.payload.peerId === peerId) {
           onForcedEviction("Direct Eviction Signal Received. Your communication access nodes have been severed by the administrator.");
           return;
@@ -200,7 +206,7 @@ export function usePeerNetwork(
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'rooms' }, (payload) => {
         if (payload.old && payload.old.id === roomId) {
-          onForcedEviction("This communication layer node has been forcefully purged by the Host Admin.");
+          onForcedEviction("This communication layer node has been forcefully purged.");
         }
       })
       .subscribe((status) => {
@@ -245,7 +251,7 @@ export function usePeerNetwork(
       setActiveUsersList([]);
       setTypingUsers([]);
     };
-  }, [roomId, peerId, userName, onMessageReceived, onReactionReceived, broadcast, loadRoomHistory, executeLazyCleanup, onSystemAlert, onForcedEviction]);
+  }, [roomId, peerId, userName, onMessageReceived, onReactionReceived, onRoomRotated, broadcast, loadRoomHistory, executeLazyCleanup, onSystemAlert, onForcedEviction]);
 
   const sendMessage = useCallback(async (message: ChatMessage) => {
     if (!roomId) return;
@@ -267,6 +273,7 @@ export function usePeerNetwork(
 
   const sendReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!roomId) return;
+    onReactionReceived(messageId, emoji, peerId); 
     broadcast({ type: 'message_reaction', payload: { messageId, reaction: emoji, peerId } });
     
     const { data } = await supabase.from('messages').select('reactions').eq('id', messageId).single();
@@ -284,7 +291,7 @@ export function usePeerNetwork(
       
       await supabase.from('messages').update({ reactions: currentReactions }).eq('id', messageId);
     }
-  }, [roomId, peerId, broadcast]);
+  }, [roomId, peerId, broadcast, onReactionReceived]);
 
   const handlePromotionControl = useCallback(async (targetId: string, commandType: 'PROMOTE' | 'DEMOTE' | 'KICK') => {
     if (userRole === 'USER') return;
@@ -294,11 +301,27 @@ export function usePeerNetwork(
       broadcast({ type: 'demote_peer', payload: { targetId } });
     } else if (commandType === 'KICK') {
       broadcast({ type: 'kick_peer', payload: { peerId: targetId } });
+      
+      if (userRole === 'OWNER') {
+        setTimeout(async () => {
+          const newRoomId = `GHOST-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+          const { data: roomData } = await supabase.from('rooms').select('*').eq('id', roomId).single();
+          if (roomData) {
+            await supabase.from('rooms').insert({ id: newRoomId, lifespan_minutes: roomData.lifespan_minutes, admin_peer_id: roomData.admin_peer_id, if_muted_globally: roomData.if_muted_globally });
+            await supabase.from('messages').update({ room_id: newRoomId }).eq('room_id', roomId);
+            broadcast({ type: 'rotate_room', payload: { newRoomId } });
+            onRoomRotated(newRoomId);
+            setTimeout(async () => {
+              await supabase.from('rooms').delete().eq('id', roomId);
+            }, 3000);
+          }
+        }, 500);
+      }
     }
     setTimeout(() => {
       broadcast({ type: 'peer_joined', payload: { peerId, peerName: userName } });
     }, 400);
-  }, [userRole, broadcast, peerId, userName]);
+  }, [roomId, userRole, broadcast, peerId, userName, onRoomRotated]);
 
   const toggleGlobalRoomMute = useCallback(async () => {
     if (userRole === 'USER') return;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, Plus, Key, LogOut, Radio, Users, ChevronUp, X, MessageSquare } from 'lucide-react';
+import { Shield, Plus, LogOut, Radio, Users, ChevronUp, X, MessageSquare } from 'lucide-react';
 
 interface SidebarProps {
   currentRoomId: string | null;
@@ -66,16 +66,16 @@ export function Sidebar({
           <span className="md:hidden lg:block">Create Room</span>
         </button>
 
-        <form onSubmit={handleSubmitJoin} className="relative md:hidden lg:block">
+        <form onSubmit={handleSubmitJoin} className="relative md:hidden lg:flex flex items-center gap-2">
           <input
             type="text"
-            placeholder="Room Code"
+            placeholder="Code"
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value)}
-            className="w-full bg-[#151824] border border-white/[0.03] focus:border-emerald-500/30 rounded-xl pl-3 pr-10 py-2 text-xs text-white placeholder-[#4c4e5e] focus:outline-none"
+            className="w-full bg-[#151824] border border-white/[0.03] focus:border-emerald-500/30 rounded-xl px-3 py-2 text-xs text-white placeholder-[#4c4e5e] focus:outline-none"
           />
-          <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[#828599] hover:text-emerald-400">
-            <Key size={14} />
+          <button type="submit" className="bg-emerald-500 hover:bg-emerald-400 text-black px-3 py-2 rounded-xl text-xs font-bold transition-all">
+            JOIN
           </button>
         </form>
       </div>

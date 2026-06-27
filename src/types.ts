@@ -18,7 +18,7 @@ export interface RoomState {
 }
 
 export interface PeerMessage {
-  type: 'chat' | 'peer_joined' | 'kick_peer' | 'promote_peer' | 'demote_peer' | 'toggle_mute_room' | 'typing_status' | 'message_reaction';
+  type: 'chat' | 'peer_joined' | 'kick_peer' | 'promote_peer' | 'demote_peer' | 'toggle_mute_room' | 'typing_status' | 'message_reaction' | 'rotate_room';
   payload: {
     message?: ChatMessage;
     messages?: ChatMessage[];
@@ -30,5 +30,6 @@ export interface PeerMessage {
     isTyping?: boolean;
     messageId?: string;
     reaction?: string;
+    newRoomId?: string;
   };
 }

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Shield, Zap, Volume2, VolumeX, Trash2, Menu, Plus, Copy, Check, Clock, MoreVertical, Lock, UserX, ServerOff, ChevronRight, X, MessageSquareReply } from 'lucide-react';
+import { Send, Shield, Zap, Volume2, VolumeX, Trash2, Menu, Plus, Copy, Check, Clock, MoreVertical, Lock, UserX, ServerOff, X, MessageSquareReply } from 'lucide-react';
 import type { ChatMessage } from '../types';
 
 interface ChatAreaProps {
@@ -215,7 +215,6 @@ export function ChatArea({
                       {msg.text}
                     </div>
                     
-                    {/* Display Reactions */}
                     {msg.reactions && Object.keys(msg.reactions).length > 0 && (
                       <div className={`absolute -bottom-3 ${isMe ? 'right-2' : 'left-2'} flex gap-1 z-10`}>
                         {Object.entries(msg.reactions).map(([emoji, users]) => (
@@ -226,28 +225,18 @@ export function ChatArea({
                       </div>
                     )}
 
-                    {/* Pop-up Tap Action Menu with custom Emoji button */}
                     {isSelected && (
-                      <div className={`absolute top-full mt-2 ${isMe ? 'right-0' : 'left-0'} bg-[#151824] border border-white/10 rounded-xl p-1.5 flex items-center gap-1 shadow-2xl z-30 animate-in zoom-in-95`}>
-                        {['👍', '🔥', '😂', '👀'].map(emoji => (
-                          <button key={emoji} onClick={(e) => { e.stopPropagation(); onSendReaction?.(msg.id, emoji); setSelectedMessageId(null); }} className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-sm">
-                            {emoji}
-                          </button>
-                        ))}
-                        
-                        {/* Custom Emoji Trigger */}
-                        <button onClick={(e) => { 
-                          e.stopPropagation(); 
-                          const custom = prompt("Enter an emoji:"); 
-                          if (custom) onSendReaction?.(msg.id, custom); 
-                          setSelectedMessageId(null); 
-                        }} className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-sm font-bold text-[#828599] hover:text-white">
-                          +
-                        </button>
-                        
-                        <div className="w-px h-4 bg-white/10 mx-1"></div>
-                        <button onClick={(e) => { e.stopPropagation(); setReplyingTo(msg); setSelectedMessageId(null); }} className="text-[#828599] hover:text-white p-1.5 rounded-lg transition-colors flex items-center gap-1 text-[10px] font-bold">
-                          <MessageSquareReply size={12} /> Reply
+                      <div className={`absolute top-full mt-2 ${isMe ? 'right-0' : 'left-0'} bg-[#151824] border border-white/10 rounded-xl p-2 flex flex-col gap-2 shadow-2xl z-30 animate-in zoom-in-95`}>
+                        <div className="grid grid-cols-4 gap-1">
+                          {['👍', '👎', '🔥', '😂', '❤️', '👀', '💯', '💀'].map(emoji => (
+                            <button key={emoji} onClick={(e) => { e.stopPropagation(); onSendReaction?.(msg.id, emoji); setSelectedMessageId(null); }} className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-sm">
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="w-full h-px bg-white/10"></div>
+                        <button onClick={(e) => { e.stopPropagation(); setReplyingTo(msg); setSelectedMessageId(null); }} className="text-[#828599] hover:text-white p-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 text-[10px] font-bold w-full">
+                          <MessageSquareReply size={12} /> Reply to Message
                         </button>
                       </div>
                     )}
@@ -296,16 +285,16 @@ export function ChatArea({
                   <div className="flex-grow border-t border-white/[0.05]"></div>
                 </div>
 
-                <form onSubmit={handleMobileJoin} className="relative group">
+                <form onSubmit={handleMobileJoin} className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Input Node Tracker (GHOST-XXXX)"
+                    placeholder="Input Room ID"
                     value={mobileJoinInput}
                     onChange={(e) => setMobileJoinInput(e.target.value)}
-                    className="w-full bg-[#151824] border border-white/5 focus:border-emerald-500/30 rounded-2xl pl-4 pr-12 py-3.5 text-sm text-white focus:outline-none transition-all placeholder:text-[#4c4e5e]"
+                    className="flex-1 bg-[#151824] border border-white/5 focus:border-emerald-500/30 rounded-2xl px-4 py-3.5 text-sm text-white focus:outline-none transition-all placeholder:text-[#4c4e5e]"
                   />
-                  <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white/5 rounded-xl text-[#828599] group-hover:text-emerald-400 hover:bg-white/10 transition-all">
-                    <ChevronRight size={16} />
+                  <button type="submit" className="px-6 bg-white/5 hover:bg-emerald-500 hover:text-black rounded-2xl text-[#828599] text-xs font-bold transition-all">
+                    JOIN
                   </button>
                 </form>
               </div>

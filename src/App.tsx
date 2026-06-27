@@ -151,6 +151,11 @@ export default function App() {
     setRoomId(null);
   }, []);
 
+  const handleRoomRotated = useCallback((newId: string) => {
+    setRoomId(newId);
+    handleSystemAlert(`🚨 TACTICAL SCRAMBLE: An admin has forcefully evicted a peer. The matrix nodes have been rotated. Your new access code is [${newId}].`);
+  }, [handleSystemAlert]);
+
   const handleForcedEvictionAction = useCallback(async (reason: string) => {
     if (!roomId) return;
     const trackingId = roomId;
@@ -165,7 +170,7 @@ export default function App() {
   }, [roomId, removeRoomFromHistory]);
 
   const { peerId, connectedPeers, userRole, isMutedGlobally, activeUsersList, typingUsers, sendMessage, sendReaction, sendTypingStatus, handlePromotionControl, toggleGlobalRoomMute } = usePeerNetwork(
-    roomId, userName, handleMessageReceived, handleHistoryReceived, handleSystemAlert, handleForcedEvictionAction, handleReactionReceived
+    roomId, userName, handleMessageReceived, handleHistoryReceived, handleSystemAlert, handleForcedEvictionAction, handleReactionReceived, handleRoomRotated
   );
 
   const handleSetUserName = useCallback((newName: string) => {
