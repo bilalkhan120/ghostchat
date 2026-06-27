@@ -29,6 +29,7 @@ export default function App() {
   const [roomId, setRoomId] = useState<string | null>(() => localStorage.getItem('ghostchat_current_room'));
   const [userName, setUserName] = useState<string>(getInitialUserName());
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [lifespanMinutes, setLifespanMinutes] = useState(60);
   const [roomCreatedAt, setRoomCreatedAt] = useState<number | null>(null);
   const [timeRemainingText, setTimeRemainingText] = useState('Calculating...');
@@ -191,19 +192,25 @@ export default function App() {
   }, [roomId, clearMessages]);
 
   const handleCreateRoom = useCallback(async (selectedLifespan: number) => {
-    const newRoomId = generateRoomId();
+    if (isCreatingRoom) return;
+    setIsCreatingRoom(true);
     
-    await supabase.from('rooms').insert({ id: newRoomId, lifespan_minutes: selectedLifespan, admin_peer_id: peerId, if_muted_globally: false });
-    await supabase.from('messages').insert({
-      id: nanoid(), room_id: newRoomId, text: `👑 CORE MATRIX STACK LOGGED BY HOST OWNER (${userName})`,
-      sender_id: 'SYSTEM', sender_name: 'SYSTEM', timestamp: Date.now(), if_system_message: true, sender_privilege_badge: 'OWNER'
-    });
+    try {
+      const newRoomId = generateRoomId();
+      await supabase.from('rooms').insert({ id: newRoomId, lifespan_minutes: selectedLifespan, admin_peer_id: peerId, if_muted_globally: false });
+      await supabase.from('messages').insert({
+        id: nanoid(), room_id: newRoomId, text: `👑 CORE MATRIX STACK LOGGED BY HOST OWNER (${userName})`,
+        sender_id: 'SYSTEM', sender_name: 'SYSTEM', timestamp: Date.now(), if_system_message: true, sender_privilege_badge: 'OWNER'
+      });
 
-    setLifespanMinutes(selectedLifespan);
-    setRoomCreatedAt(Date.now());
-    setRoomId(newRoomId);
-    setShowCreateModal(false);
-  }, [peerId, userName]);
+      setLifespanMinutes(selectedLifespan);
+      setRoomCreatedAt(Date.now());
+      setRoomId(newRoomId);
+      setShowCreateModal(false);
+    } finally {
+      setIsCreatingRoom(false);
+    }
+  }, [peerId, userName, isCreatingRoom]);
 
   const handleJoinRoom = useCallback(async (id: string) => {
     const cleanId = id.trim().toUpperCase();
@@ -243,7 +250,7 @@ export default function App() {
   }, [roomId, userRole, removeRoomFromHistory]);
 
   return (
-    <div className="fixed inset-0 h-[100dvh] w-full flex bg-[#0b0c10] text-white overflow-hidden font-sans selection:bg-emerald-500/30">
+    <div className="fixed inset-0 flex bg-[#0b0c10] text-white overflow-hidden font-sans selection:bg-emerald-500/30">
       {isMobileSidebarOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden block transition-opacity duration-200" onClick={() => setIsMobileSidebarOpen(false)} />
       )}

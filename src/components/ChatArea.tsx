@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Shield, Zap, Volume2, VolumeX, Trash2, Menu, Plus, Copy, Check, Clock, MoreVertical, Lock, UserX, ServerOff, X, MessageSquareReply } from 'lucide-react';
+import { Send, Shield, Zap, Volume2, VolumeX, Trash2, Menu, Plus, Copy, Check, Clock, MoreVertical, Lock, UserX, ServerOff, ChevronRight, X, MessageSquareReply } from 'lucide-react';
 import type { ChatMessage } from '../types';
 
 interface ChatAreaProps {
@@ -226,17 +226,17 @@ export function ChatArea({
                     )}
 
                     {isSelected && (
-                      <div className={`absolute top-full mt-2 ${isMe ? 'right-0' : 'left-0'} bg-[#151824] border border-white/10 rounded-xl p-2 flex flex-col gap-2 shadow-2xl z-30 animate-in zoom-in-95`}>
-                        <div className="grid grid-cols-4 gap-1">
+                      <div className={`absolute top-full mt-2 ${isMe ? 'right-0' : 'left-0'} bg-[#1a1d27] border border-white/10 rounded-3xl p-3 shadow-2xl z-30 w-64 animate-in zoom-in-95 origin-top`}>
+                        <div className="flex flex-wrap gap-2 justify-center mb-3">
                           {['👍', '👎', '🔥', '😂', '❤️', '👀', '💯', '💀'].map(emoji => (
-                            <button key={emoji} onClick={(e) => { e.stopPropagation(); onSendReaction?.(msg.id, emoji); setSelectedMessageId(null); }} className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-sm">
+                            <button key={emoji} onClick={(e) => { e.stopPropagation(); onSendReaction?.(msg.id, emoji); setSelectedMessageId(null); }} className="hover:bg-white/10 w-10 h-10 rounded-full flex items-center justify-center transition-all text-xl hover:scale-110 active:scale-95 bg-[#151824]">
                               {emoji}
                             </button>
                           ))}
                         </div>
-                        <div className="w-full h-px bg-white/10"></div>
-                        <button onClick={(e) => { e.stopPropagation(); setReplyingTo(msg); setSelectedMessageId(null); }} className="text-[#828599] hover:text-white p-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 text-[10px] font-bold w-full">
-                          <MessageSquareReply size={12} /> Reply to Message
+                        <div className="w-full h-px bg-white/10 mb-2"></div>
+                        <button onClick={(e) => { e.stopPropagation(); setReplyingTo(msg); setSelectedMessageId(null); }} className="text-[#828599] hover:text-white p-2 rounded-xl hover:bg-white/5 transition-colors flex items-center justify-center gap-2 text-xs font-bold w-full">
+                          <MessageSquareReply size={14} /> Reply to Message
                         </button>
                       </div>
                     )}

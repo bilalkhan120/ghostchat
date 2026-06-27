@@ -295,33 +295,19 @@ export function usePeerNetwork(
 
   const handlePromotionControl = useCallback(async (targetId: string, commandType: 'PROMOTE' | 'DEMOTE' | 'KICK') => {
     if (userRole === 'USER') return;
+    
     if (commandType === 'PROMOTE') {
       broadcast({ type: 'promote_peer', payload: { targetId } });
     } else if (commandType === 'DEMOTE') {
       broadcast({ type: 'demote_peer', payload: { targetId } });
     } else if (commandType === 'KICK') {
       broadcast({ type: 'kick_peer', payload: { peerId: targetId } });
-      
-      if (userRole === 'OWNER') {
-        setTimeout(async () => {
-          const newRoomId = `GHOST-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
-          const { data: roomData } = await supabase.from('rooms').select('*').eq('id', roomId).single();
-          if (roomData) {
-            await supabase.from('rooms').insert({ id: newRoomId, lifespan_minutes: roomData.lifespan_minutes, admin_peer_id: roomData.admin_peer_id, if_muted_globally: roomData.if_muted_globally });
-            await supabase.from('messages').update({ room_id: newRoomId }).eq('room_id', roomId);
-            broadcast({ type: 'rotate_room', payload: { newRoomId } });
-            onRoomRotated(newRoomId);
-            setTimeout(async () => {
-              await supabase.from('rooms').delete().eq('id', roomId);
-            }, 3000);
-          }
-        }, 500);
-      }
     }
+    
     setTimeout(() => {
       broadcast({ type: 'peer_joined', payload: { peerId, peerName: userName } });
     }, 400);
-  }, [roomId, userRole, broadcast, peerId, userName, onRoomRotated]);
+  }, [userRole, broadcast, peerId, userName]);
 
   const toggleGlobalRoomMute = useCallback(async () => {
     if (userRole === 'USER') return;
