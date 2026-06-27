@@ -123,13 +123,16 @@ export function Sidebar({
           {showUsersDropdown && (
             <div className="max-h-48 overflow-y-auto px-3 pb-3 space-y-1">
               {activeUsersList.map((usr) => (
-                <div key={usr.peerId} className="py-1.5 flex items-center justify-between text-[11px] border-b border-white/[0.01]">
+                <div key={usr.peerId} className="py-2 flex items-center justify-between text-[11px] border-b border-white/[0.01]">
                   <div className="flex flex-col min-w-0 pr-2">
                     <span className="font-semibold text-white truncate">{usr.name || usr.userName || 'Anonymous'}</span>
                     <span className={`text-[9px] font-bold tracking-wider ${usr.role === 'OWNER' ? 'text-emerald-400' : 'text-[#4c4e5e]'}`}>{usr.role || 'PEER'}</span>
                   </div>
                   {userRole === 'OWNER' && usr.role !== 'OWNER' && (
-                    <button onClick={() => onPromotionControl(usr.peerId, 'EVICT')} className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 text-[9px] font-bold hover:bg-red-500/20">Evict</button>
+                    <div className="flex flex-col gap-1 sm:flex-row">
+                      <button onClick={() => onPromotionControl(usr.peerId, 'PROMOTE')} className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold hover:bg-emerald-500/20">Promote</button>
+                      <button onClick={() => onPromotionControl(usr.peerId, 'KICK')} className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 text-[9px] font-bold hover:bg-red-500/20">Kick</button>
+                    </div>
                   )}
                 </div>
               ))}

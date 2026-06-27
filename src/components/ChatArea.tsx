@@ -104,7 +104,7 @@ export function ChatArea({
       ${isUrgentExpiry ? 'border-t-2 border-t-red-500 shadow-[inset_0_5px_15px_rgba(239,68,68,0.1)]' : ''}`}
       onClick={() => setSelectedMessageId(null)}
     >
-      <div className="h-16 border-b border-white/[0.04] bg-[#0f111a]/80 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between shrink-0">
+      <div className="h-16 border-b border-white/[0.04] bg-[#0f111a]/80 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between shrink-0 z-20">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button onClick={onOpenMobileMenu} className="p-2 rounded-xl text-[#828599] hover:text-white hover:bg-white/5 transition-all md:hidden shrink-0">
             <Menu size={18} />
@@ -177,7 +177,7 @@ export function ChatArea({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/5">
+      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/5 relative z-10 pb-4">
         {roomId ? (
           <div className="px-4 py-6 space-y-4">
             {messages.map((msg) => {
@@ -215,6 +215,7 @@ export function ChatArea({
                       {msg.text}
                     </div>
                     
+                    {/* Display Reactions */}
                     {msg.reactions && Object.keys(msg.reactions).length > 0 && (
                       <div className={`absolute -bottom-3 ${isMe ? 'right-2' : 'left-2'} flex gap-1 z-10`}>
                         {Object.entries(msg.reactions).map(([emoji, users]) => (
@@ -225,13 +226,25 @@ export function ChatArea({
                       </div>
                     )}
 
+                    {/* Pop-up Tap Action Menu with custom Emoji button */}
                     {isSelected && (
-                      <div className={`absolute top-full mt-2 ${isMe ? 'right-0' : 'left-0'} bg-[#151824] border border-white/10 rounded-xl p-1.5 flex items-center gap-1 shadow-2xl z-20 animate-in zoom-in-95`}>
+                      <div className={`absolute top-full mt-2 ${isMe ? 'right-0' : 'left-0'} bg-[#151824] border border-white/10 rounded-xl p-1.5 flex items-center gap-1 shadow-2xl z-30 animate-in zoom-in-95`}>
                         {['👍', '🔥', '😂', '👀'].map(emoji => (
                           <button key={emoji} onClick={(e) => { e.stopPropagation(); onSendReaction?.(msg.id, emoji); setSelectedMessageId(null); }} className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-sm">
                             {emoji}
                           </button>
                         ))}
+                        
+                        {/* Custom Emoji Trigger */}
+                        <button onClick={(e) => { 
+                          e.stopPropagation(); 
+                          const custom = prompt("Enter an emoji:"); 
+                          if (custom) onSendReaction?.(msg.id, custom); 
+                          setSelectedMessageId(null); 
+                        }} className="hover:bg-white/10 p-1.5 rounded-lg transition-colors text-sm font-bold text-[#828599] hover:text-white">
+                          +
+                        </button>
+                        
                         <div className="w-px h-4 bg-white/10 mx-1"></div>
                         <button onClick={(e) => { e.stopPropagation(); setReplyingTo(msg); setSelectedMessageId(null); }} className="text-[#828599] hover:text-white p-1.5 rounded-lg transition-colors flex items-center gap-1 text-[10px] font-bold">
                           <MessageSquareReply size={12} /> Reply
@@ -334,7 +347,7 @@ export function ChatArea({
       </div>
 
       {roomId && (
-        <div className="p-3 sm:p-4 bg-[#0b0c10] shrink-0 border-t border-white/[0.04] flex flex-col">
+        <div className="p-3 sm:p-4 bg-[#0b0c10] shrink-0 border-t border-white/[0.04] flex flex-col relative z-20">
           {replyingTo && (
             <div className="mb-2 bg-[#151824] border border-emerald-500/30 rounded-xl p-2.5 flex items-start justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 shadow-lg">
               <div className="min-w-0 flex-1 border-l-2 border-emerald-500 pl-2">
